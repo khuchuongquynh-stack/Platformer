@@ -1,0 +1,1322 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Platformer - Ultimate Edition</title>
+<style>
+  :root {
+    --cursor-default: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M10,2 L2,18 L10,18 L14,28 L20,22 L12,14 L24,14 Z" fill="white" stroke="black" stroke-width="1.5" stroke-linejoin="round"/><path d="M7,8 L9,10 M14,8 L16,10 M7,14 L9,16 L12,16 L14,14" fill="none" stroke="black" stroke-width="1.5" stroke-linecap="round"/></svg>') 10 2, auto;
+    --cursor-pointer: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M16,2 L26,12 L26,26 L6,26 L6,12 Z" fill="white" stroke="black" stroke-width="1.5" stroke-linejoin="miter"/><rect x="6" y="26" width="20" height="4" fill="white" stroke="black" stroke-width="1.5"/><line x1="16" y1="2" x2="16" y2="15" stroke="%23ef4444" stroke-width="1.5"/><circle cx="16" cy="15" r="3" fill="none" stroke="%23ef4444" stroke-width="1.5"/></svg>') 16 2, pointer;
+  }
+
+  * { box-sizing: border-box; }
+  
+  html, body {
+    margin: 0; padding: 0; overflow: hidden; 
+    background: #0b1220;
+    width: 100vw; height: 100vh;
+    font-family: system-ui, -apple-system, sans-serif;
+    cursor: var(--cursor-default);
+    user-select: none; -webkit-user-select: none;
+  }
+
+  .game-container {
+    width: 100vw; height: 56.25vw; 
+    max-height: 100vh; max-width: 177.78vh; 
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex; justify-content: center; align-items: center;
+    background: #0b1220;
+    overflow: hidden;
+  }
+
+  canvas {
+    width: 100%; height: 100%; display: block;
+    image-rendering: pixelated; image-rendering: crisp-edges;
+    cursor: var(--cursor-pointer);
+  }
+  canvas.playing { cursor: var(--cursor-default); }
+
+  /* ================= MAIN MENU ================= */
+  #mainMenu {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(11, 18, 32, 0.95);
+    z-index: 5000; display: flex; flex-direction: column;
+    justify-content: center; align-items: center; gap: 20px;
+    backdrop-filter: blur(5px);
+    transition: opacity 0.3s;
+  }
+  #mainMenu.hidden { opacity: 0; pointer-events: none; }
+  
+  .menu-title {
+    font-size: 48px; font-weight: 900; color: #fff;
+    text-transform: uppercase; letter-spacing: 4px;
+    text-shadow: 0 4px 0 #1e3a8a, 0 8px 15px rgba(0,0,0,0.5);
+    margin-bottom: 20px; text-align: center;
+    background: linear-gradient(to bottom, #60a5fa, #2563eb);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  
+  .menu-btn {
+    background: #1e293b; color: #e2e8f0;
+    border: 2px solid #334155; border-radius: 12px;
+    padding: 15px 40px; font-size: 20px; font-weight: bold;
+    cursor: var(--cursor-pointer); transition: all 0.2s;
+    width: 300px; text-align: center;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+  }
+  .menu-btn:hover { background: #3b82f6; border-color: #60a5fa; color: #fff; transform: translateY(-2px); }
+  .menu-btn:active { transform: translateY(2px); }
+  .menu-btn.primary { background: #16a34a; border-color: #22c55e; color: #fff; }
+  .menu-btn.primary:hover { background: #15803d; }
+
+  /* Nút bánh răng (Tool) */
+  #toggleToolBtn {
+    position: fixed; top: 20px; right: 20px; z-index: 1001;
+    background: #1b2436; color: #cbd5e1; border: 2px solid #3b82f6;
+    width: 50px; height: 50px; border-radius: 50%; cursor: var(--cursor-pointer);
+    font-size: 24px; display: flex; justify-content: center; align-items: center;
+    transition: .2s; box-shadow: 0 4px 12px rgba(0,0,0,0.5); padding: 0;
+  }
+  #toggleToolBtn:hover { background: #2563eb; transform: rotate(45deg); }
+  #toggleToolBtn.hidden { opacity: 0; pointer-events: none; }
+
+  /* Bảng TOOL */
+  #toolPanel {
+    position: fixed; top: 0; right: -380px; width: 350px; height: 100vh;
+    background: #0f172a; border-left: 1px solid #1e293b;
+    padding: 15px; z-index: 2005; overflow-y: auto;
+    transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  #toolPanel.open { right: 0; }
+
+  #toolPanel.open ~ #feedbackContainer,
+  #toolPanel.open ~ #fsBtn,
+  #toolPanel.open ~ #playBtn,
+  #toolPanel.open ~ #menuBtn {
+    display: none !important;
+  }
+
+  .panel-title {
+    font-size: 16px; font-weight: bold; color: #60a5fa; margin: 0 0 5px 0;
+    border-bottom: 1px solid #1e293b; padding-bottom: 10px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .panel-title button {
+    background: none; border: none; color: #ef4444; font-size: 20px;
+    cursor: var(--cursor-pointer); padding: 0;
+  }
+  .group-title { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-top: 5px; }
+  .btn-group { display: flex; flex-wrap: wrap; gap: 6px; }
+  
+  button.tool-btn {
+    background: #1e293b; color: #cbd5e1; border: 1px solid #334155;
+    padding: 6px 10px; border-radius: 6px; cursor: var(--cursor-pointer);
+    font-size: 12px; text-align: center; transition: .15s;
+    flex: 1 1 45%;
+  }
+  button.tool-btn:hover { background: #2dd4bf; border-color: #14b8a6; color: #000; }
+  button.tool-btn.active { background: #3b82f6; border-color: #60a5fa; color: #fff; }
+  
+  .divider { height: 1px; background: #1e293b; margin: 5px 0; }
+
+  /* Nút CHƠI và MENU */
+  #playBtn {
+    position: fixed; top: 20px; left: 20px; z-index: 999;
+    background: #16a34a; color: #fff; border: 2px solid #22c55e;
+    padding: 10px 20px; border-radius: 8px; cursor: var(--cursor-pointer);
+    font-size: 16px; font-weight: bold; font-family: inherit; transition: .2s;
+  }
+  #playBtn:hover { background: #15803d; transform: scale(1.05); }
+  #playBtn.danger { background: #dc2626; border-color: #ef4444; }
+  #playBtn.danger:hover { background: #b91c1c; }
+
+  #menuBtn {
+    position: fixed; top: 20px; left: 150px; z-index: 999;
+    background: #1e293b; color: #cbd5e1; border: 2px solid #475569;
+    padding: 10px 20px; border-radius: 8px; cursor: var(--cursor-pointer);
+    font-size: 16px; font-weight: bold; font-family: inherit; transition: .2s;
+  }
+  #menuBtn:hover { background: #334155; color: #fff; }
+
+  /* Nút Toàn Màn Hình */
+  #fsBtn {
+    position: fixed; bottom: 20px; left: 20px; z-index: 999;
+    background: #1e293b; color: #cbd5e1; border: 2px solid #475569;
+    padding: 8px 16px; border-radius: 8px; cursor: var(--cursor-pointer);
+    font-size: 14px; font-weight: bold; font-family: inherit; transition: .2s;
+    display: flex; align-items: center; gap: 5px;
+  }
+  #fsBtn:hover { background: #334155; color: #fff; }
+
+  /* Trạng thái */
+  #status {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.9); color: #7dd3fc;
+    padding: 8px 16px; border-radius: 20px; font-size: 13px;
+    border: 1px solid #0ea5e9; transition: opacity 0.3s; pointer-events: none;
+    z-index: 999;
+  }
+  #status.hidden { opacity: 0; }
+
+  .row { display: flex; gap: 6px; }
+  .row button { flex: 1; justify-content: center; }
+
+  /* NÚT GÓP Ý */
+  #feedbackContainer {
+    position: fixed; bottom: 15px; right: 15px; z-index: 1002;
+  }
+  #feedbackBtn {
+    background: #1e293b; color: #38bdf8; border: 1px solid #0ea5e9;
+    padding: 8px 12px; border-radius: 20px; font-size: 13px; font-weight: bold;
+    cursor: var(--cursor-pointer); transition: .2s; display: flex; align-items: center; gap: 5px;
+  }
+  #feedbackBtn:hover { background: #0ea5e9; color: #fff; }
+  #feedbackBtn .question-mark {
+    background: #0ea5e9; color: #fff; border-radius: 50%;
+    width: 18px; height: 18px; display: inline-flex; justify-content: center; align-items: center;
+    font-size: 12px;
+  }
+
+  /* MODAL GÓP Ý */
+  #feedbackModal {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.7); z-index: 3000;
+    justify-content: center; align-items: center; cursor: auto;
+  }
+  #feedbackModal.open { display: flex; }
+  .modal-content {
+    background: #0f172a; border: 1px solid #1e293b; padding: 20px;
+    border-radius: 12px; width: 90%; max-width: 400px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8); cursor: auto;
+  }
+  .modal-content h2 { margin: 0 0 15px 0; color: #38bdf8; font-size: 18px; }
+  .modal-content label { display: block; margin-bottom: 5px; font-size: 13px; color: #cbd5e1; }
+  .modal-content input, .modal-content textarea {
+    width: 100%; padding: 8px; margin-bottom: 12px;
+    background: #1e293b; border: 1px solid #334155; border-radius: 6px;
+    color: #fff; font-family: inherit; font-size: 14px; outline: none;
+  }
+  .modal-content input:focus, .modal-content textarea:focus { border-color: #3b82f6; }
+  .modal-content textarea { resize: vertical; min-height: 80px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .modal-actions button {
+    padding: 8px 16px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer;
+  }
+  .modal-actions .cancel { background: #334155; color: #cbd5e1; }
+  .modal-actions .send { background: #16a34a; color: #fff; }
+
+  /* ================= ĐIỀU KHIỂN MOBILE (JOYSTICK) ================= */
+  #mobileControls {
+    display: none;
+    position: fixed; bottom: 20px; left: 0; width: 100%; padding: 0 20px;
+    z-index: 998; pointer-events: none;
+    justify-content: space-between; align-items: flex-end;
+  }
+  
+  /* Vùng Joystick bên trái */
+  #joystickZone {
+    width: 120px; height: 120px;
+    background: rgba(15, 23, 42, 0.5);
+    border: 2px solid rgba(71, 85, 105, 0.8);
+    border-radius: 50%; position: relative;
+    pointer-events: auto; touch-action: none;
+    display: flex; justify-content: center; align-items: center;
+    box-shadow: 0 0 15px rgba(0,0,0,0.5);
+  }
+  #joystickKnob {
+    width: 50px; height: 50px;
+    background: #3b82f6; border: 2px solid #60a5fa;
+    border-radius: 50%; position: absolute;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    transition: transform 0.1s;
+  }
+
+  /* Nút Nhảy bên phải */
+  #btnJump {
+    width: 80px; height: 80px; border-radius: 50%; 
+    background: rgba(22, 163, 74, 0.6);
+    color: #fff; border: 3px solid #22c55e; 
+    font-size: 16px; font-weight: bold;
+    pointer-events: auto; display: flex; justify-content: center; align-items: center;
+    touch-action: none; -webkit-tap-highlight-color: transparent; text-transform: uppercase;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    margin-right: 10px;
+  }
+  #btnJump:active { background: #22c55e; transform: scale(0.95); }
+
+  /* Hiển thị trên thiết bị di động */
+  @media (pointer: coarse) or (max-width: 768px) {
+    body { cursor: auto; }
+    canvas { cursor: auto; }
+    #mobileControls.active { display: flex; }
+    #feedbackContainer { bottom: 160px; right: 15px; }
+    #fsBtn { display: none; }
+    #menuBtn { left: 120px; padding: 8px 12px; font-size: 14px; }
+    #playBtn { padding: 8px 12px; font-size: 14px; }
+    .menu-title { font-size: 32px; }
+    .menu-btn { width: 250px; font-size: 16px; }
+    #toolPanel { width: 300px; right: -310px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="game-container">
+  <canvas id="cv"></canvas>
+  
+  <!-- Màn hình Menu chính -->
+  <div id="mainMenu">
+    <div class="menu-title">PLATFORMER</div>
+    <button class="menu-btn primary" id="menuPlayBtn">▶ CHƠI NGAY</button>
+    <button class="menu-btn" id="menuEditBtn">✏️ CHỈNH SỬA MÀN CHƠI</button>
+    <button class="menu-btn" id="menuSampleBtn">📐 TẢI MÀN MẪU</button>
+  </div>
+</div>
+
+<!-- Nút Điều khiển (Ẩn khi ở Menu) -->
+<button id="playBtn" class="hidden">▶ CHƠI</button>
+<button id="menuBtn" class="hidden">☰ MENU</button>
+<button id="toggleToolBtn" class="hidden">⚙️</button>
+<button id="fsBtn" class="hidden">⛶ TOÀN MÀN HÌNH</button>
+
+<!-- Điều khiển Mobile: Joystick + Jump -->
+<div id="mobileControls">
+  <div id="joystickZone">
+    <div id="joystickKnob"></div>
+  </div>
+  <button id="btnJump">Nhảy</button>
+</div>
+
+<div id="feedbackContainer" class="hidden">
+  <button id="feedbackBtn"><span class="question-mark">?</span> GÓP Ý</button>
+</div>
+
+<div id="feedbackModal">
+  <div class="modal-content">
+    <h2>📬 Gửi Góp Ý Cho Admin</h2>
+    <label>Email của bạn:</label>
+    <input type="email" id="fbEmail" placeholder="ví dụ: nguyenvana@gmail.com" required>
+    <label>Nội dung góp ý:</label>
+    <textarea id="fbMessage" placeholder="Nhập ý kiến đóng góp của bạn tại đây..."></textarea>
+    <div class="modal-actions">
+      <button class="cancel" id="fbCancelBtn">Hủy</button>
+      <button class="send" id="fbSendBtn">Gửi qua Gmail</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bảng chức năng -->
+<div id="toolPanel">
+  <div class="panel-title">
+    <span>🛠️ CÔNG CỤ</span>
+    <button id="closeToolBtn">✖</button>
+  </div>
+
+  <div class="row">
+    <button id="undoBtn" class="tool-btn" style="background:#475569; color:#fff;">↩ Undo (Ctrl+Z)</button>
+    <button id="redoBtn" class="tool-btn" style="background:#475569; color:#fff;">↪ Redo (Ctrl+Y)</button>
+  </div>
+
+  <div class="group-title">Địa hình & Vật phẩm</div>
+  <div class="btn-group" id="toolButtons">
+    <button data-tool="block" class="tool-btn active">🧱 Gạch (1)</button>
+    <button data-tool="erase" class="tool-btn">🧹 Xóa (2)</button>
+    <button data-tool="start" class="tool-btn">🟢 Start (3)</button>
+    <button data-tool="goal" class="tool-btn">🏁 Goal (5)</button>
+    <button data-tool="jumpPad" class="tool-btn">🦘 Lò xo (J)</button>
+    <button data-tool="checkpoint" class="tool-btn">🚩 Checkpoint (C)</button>
+    <button data-tool="key" class="tool-btn">🔑 Chìa khóa (K)</button>
+    <button data-tool="door" class="tool-btn">🚪 Cửa (D)</button>
+  </div>
+  
+  <div class="group-title">Kẻ địch & Bẫy</div>
+  <div class="btn-group">
+    <button data-tool="enemy" class="tool-btn">👾 Đi bộ (4)</button>
+    <button data-tool="flyEnemy" class="tool-btn">🦇 Bay (F)</button>
+    <button data-tool="fire" class="tool-btn">🔥 Lửa (6)</button>
+  </div>
+
+  <div class="group-title">Mạch điện & Logic</div>
+  <div class="btn-group">
+    <button data-tool="mover" class="tool-btn">➡️ Di chuyển (7)</button>
+    <button data-tool="switch" class="tool-btn">🔘 Nút chạm (8)</button>
+    <button data-tool="mouseSwitch" class="tool-btn">🖱️ Nút chuột (9)</button>
+    <button data-tool="sensorSwitch" class="tool-btn">📡 Cảm ứng (T)</button>
+    <button data-tool="wire" class="tool-btn">🔌 Dây điện (0)</button>
+  </div>
+
+  <div class="divider"></div>
+  <div class="group-title">Cài đặt</div>
+  <div class="row">
+    <button id="toggleDarkBtn" class="tool-btn">🔦 Bóng tối: OFF</button>
+  </div>
+  <div class="row">
+    <button id="sampleBtn" class="tool-btn">📐 Màn mẫu</button>
+    <button id="clearBtn" class="tool-btn">🗑 Xóa trắng</button>
+  </div>
+  <div class="row">
+    <button id="saveBtn" class="tool-btn">💾 Lưu</button>
+    <button id="loadBtn" class="tool-btn">📂 Tải</button>
+  </div>
+  
+  <div class="divider"></div>
+  <div class="group-title" style="font-size: 10px; line-height: 1.4; color: #94a3b8;">
+    * <b>Camera:</b> Dùng phím mũi tên Trái/Phải để di chuyển camera khi Sửa.<br>
+    * <b>Nối dây:</b> Chọn Dây điện (0), click vào Nút, sau đó click vào Khối di chuyển.
+  </div>
+</div>
+
+<div id="status" class="hidden">Sẵn sàng.</div>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ================= CẤU HÌNH ================= */
+  const TILE = 32, COLS = 64, ROWS = 18;
+  const W = COLS * TILE, H = ROWS * TILE;
+  const GRAVITY = 0.65, MAXFALL = 15, SPEED = 3.6, JUMP = -11.5;
+  const MOVER_SPEED = 4.5;
+  const STEP = 1000 / 60;
+
+  const cv = document.getElementById('cv');
+  cv.width = 1024; cv.height = 576; 
+  const ctx = cv.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+
+  /* ================= ÂM THANH ================= */
+  let audioCtx;
+  function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+  function playSFX(type) {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    const now = audioCtx.currentTime;
+
+    if (type === 'jump') {
+      osc.type = 'square'; osc.frequency.setValueAtTime(150, now); osc.frequency.exponentialRampToValueAtTime(300, now + 0.1);
+      gain.gain.setValueAtTime(0.05, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+      osc.start(now); osc.stop(now + 0.1);
+    } else if (type === 'coin') {
+      osc.type = 'sine'; osc.frequency.setValueAtTime(800, now); osc.frequency.setValueAtTime(1200, now + 0.1);
+      gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+      osc.start(now); osc.stop(now + 0.2);
+    } else if (type === 'hit') {
+      osc.type = 'sawtooth'; osc.frequency.setValueAtTime(100, now); osc.frequency.exponentialRampToValueAtTime(50, now + 0.3);
+      gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+      osc.start(now); osc.stop(now + 0.3);
+    } else if (type === 'switch') {
+      osc.type = 'square'; osc.frequency.setValueAtTime(400, now); osc.frequency.setValueAtTime(600, now + 0.05);
+      gain.gain.setValueAtTime(0.05, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+      osc.start(now); osc.stop(now + 0.1);
+    } else if (type === 'win') {
+      osc.type = 'triangle'; osc.frequency.setValueAtTime(400, now); osc.frequency.setValueAtTime(600, now + 0.1); osc.frequency.setValueAtTime(800, now + 0.2);
+      gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+      osc.start(now); osc.stop(now + 0.4);
+    }
+  }
+
+  /* ================= TRẠNG THÁI ================= */
+  let grid, startPos, goalPos, respawnPos;
+  let enemies, flyEnemies, fires, movers, switches;
+  let jumpPads, checkpoints, keysItems, doors;
+  
+  let mode = 'menu'; // 'menu', 'play', 'edit'
+  let tool = 'block';
+  let player = null, playEnemies = [], playFlyEnemies = [], win = false;
+  let coyote = 0, prevJump = false;
+  let painting = false;
+  let hover = null;
+  let selectedSwitch = null;
+  let isDarkMode = false;
+
+  let camera = { x: 0, y: 0 };
+  let particles = [];
+  let shakeIntensity = 0;
+  let undoStack = [], redoStack = [];
+
+  const keys = Object.create(null);
+
+  /* ================= DOM UI ================= */
+  const mainMenu = document.getElementById('mainMenu');
+  const playBtn = document.getElementById('playBtn');
+  const menuBtn = document.getElementById('menuBtn');
+  const toolPanel = document.getElementById('toolPanel');
+  const toggleToolBtn = document.getElementById('toggleToolBtn');
+  const closeToolBtn = document.getElementById('closeToolBtn');
+  const statusEl = document.getElementById('status');
+  const toolBtns = [...document.querySelectorAll('[data-tool]')];
+  const toggleDarkBtn = document.getElementById('toggleDarkBtn');
+  const mobileControls = document.getElementById('mobileControls');
+  const feedbackContainer = document.getElementById('feedbackContainer');
+  const fsBtn = document.getElementById('fsBtn');
+
+  toggleDarkBtn.addEventListener('click', () => {
+    isDarkMode = !isDarkMode;
+    toggleDarkBtn.textContent = `🔦 Bóng tối: ${isDarkMode ? 'ON' : 'OFF'}`;
+    toggleDarkBtn.style.background = isDarkMode ? '#3b82f6' : '#1e293b';
+  });
+
+  fsBtn.addEventListener('click', () => {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(e => alert(e.message));
+    else document.exitFullscreen();
+  });
+
+  const feedbackModal = document.getElementById('feedbackModal');
+  const fbEmail = document.getElementById('fbEmail');
+  const fbMessage = document.getElementById('fbMessage');
+
+  toggleToolBtn.addEventListener('click', () => toolPanel.classList.add('open'));
+  closeToolBtn.addEventListener('click', () => toolPanel.classList.remove('open'));
+
+  document.getElementById('feedbackBtn').addEventListener('click', () => feedbackModal.classList.add('open'));
+  document.getElementById('fbCancelBtn').addEventListener('click', () => feedbackModal.classList.remove('open'));
+  document.getElementById('fbSendBtn').addEventListener('click', () => {
+    const email = fbEmail.value.trim(), message = fbMessage.value.trim();
+    if (!email || !message) { alert("Vui lòng điền đầy đủ thông tin!"); return; }
+    window.location.href = `mailto:khuchuongquynh@gmail.com?subject=${encodeURIComponent('Góp ý game')}&body=${encodeURIComponent(`Góp ý:\n${message}\n\nEmail: ${email}`)}`;
+    feedbackModal.classList.remove('open'); toast('Đang mở Email...');
+  });
+
+  /* ================= MENU LOGIC ================= */
+  function showMenu() {
+    mode = 'menu';
+    mainMenu.classList.remove('hidden');
+    playBtn.classList.add('hidden');
+    menuBtn.classList.add('hidden');
+    toggleToolBtn.classList.add('hidden');
+    mobileControls.classList.remove('active');
+    feedbackContainer.classList.add('hidden');
+    fsBtn.classList.add('hidden');
+    toolPanel.classList.remove('open');
+    cv.classList.remove('playing');
+  }
+
+  function hideMenu() {
+    mainMenu.classList.add('hidden');
+    playBtn.classList.remove('hidden');
+    menuBtn.classList.remove('hidden');
+    toggleToolBtn.classList.remove('hidden');
+    feedbackContainer.classList.remove('hidden');
+    fsBtn.classList.remove('hidden');
+    
+    // Chỉ bật mobileControls nếu là thiết bị di động
+    if (window.innerWidth <= 768 || 'ontouchstart' in window) {
+      mobileControls.classList.add('active');
+    }
+  }
+
+  document.getElementById('menuPlayBtn').addEventListener('click', () => {
+    hideMenu();
+    startGame();
+  });
+
+  document.getElementById('menuEditBtn').addEventListener('click', () => {
+    hideMenu();
+    mode = 'edit';
+    camera.x = 0;
+    toast('Đã vào chế độ Chỉnh sửa ✏️');
+  });
+
+  document.getElementById('menuSampleBtn').addEventListener('click', () => {
+    resetLevel();
+    hideMenu();
+    mode = 'edit';
+    camera.x = 0;
+    toast('Đã tải màn mẫu 📐');
+  });
+
+  menuBtn.addEventListener('click', () => {
+    if (mode === 'play') {
+      playBtn.textContent = '▶ CHƠI'; playBtn.classList.remove('danger');
+      cv.classList.remove('playing');
+      toolBtns.forEach(b => b.disabled = false);
+      player = null; playEnemies = []; playFlyEnemies = []; win = false;
+    }
+    showMenu();
+  });
+
+  /* ================= JOYSTICK LOGIC ================= */
+  const joystickZone = document.getElementById('joystickZone');
+  const joystickKnob = document.getElementById('joystickKnob');
+  let joystickActive = false;
+  let joystickCenter = { x: 0, y: 0 };
+  const maxDist = 35; // Khoảng cách tối đa cần gạt có thể di chuyển
+
+  joystickZone.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    joystickActive = true;
+    const rect = joystickZone.getBoundingClientRect();
+    joystickCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    updateJoystick(e.clientX, e.clientY);
+    joystickZone.setPointerCapture(e.pointerId);
+  });
+
+  joystickZone.addEventListener('pointermove', e => {
+    if (!joystickActive) return;
+    e.preventDefault();
+    updateJoystick(e.clientX, e.clientY);
+  });
+
+  joystickZone.addEventListener('pointerup', e => {
+    joystickActive = false;
+    joystickKnob.style.transform = `translate(0px, 0px)`;
+    keys['ArrowLeft'] = false;
+    keys['ArrowRight'] = false;
+  });
+  
+  joystickZone.addEventListener('pointercancel', e => {
+    joystickActive = false;
+    joystickKnob.style.transform = `translate(0px, 0px)`;
+    keys['ArrowLeft'] = false;
+    keys['ArrowRight'] = false;
+  });
+
+  function updateJoystick(clientX, clientY) {
+    let dx = clientX - joystickCenter.x;
+    let dy = clientY - joystickCenter.y;
+    const distance = Math.sqrt(dx*dx + dy*dy);
+
+    // Giới hạn khoảng cách của cần gạt
+    if (distance > maxDist) {
+      dx = (dx / distance) * maxDist;
+      dy = (dy / distance) * maxDist;
+    }
+
+    joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+
+    // Xác định hướng (chỉ quan tâm trục X cho platformer 2D)
+    const deadzone = 10;
+    keys['ArrowLeft'] = dx < -deadzone;
+    keys['ArrowRight'] = dx > deadzone;
+  }
+
+  document.getElementById('btnJump').addEventListener('pointerdown', e => {
+    e.preventDefault(); keys['Space'] = true;
+  });
+  document.getElementById('btnJump').addEventListener('pointerup', e => {
+    e.preventDefault(); keys['Space'] = false;
+  });
+  document.getElementById('btnJump').addEventListener('pointercancel', e => {
+    e.preventDefault(); keys['Space'] = false;
+  });
+  document.getElementById('btnJump').addEventListener('pointerleave', e => {
+    e.preventDefault(); keys['Space'] = false;
+  });
+
+  /* ================= TIỆN ÍCH ================= */
+  function newGrid() { return Array.from({length: ROWS}, () => new Array(COLS).fill(0)); }
+  
+  function isSolid(tx, ty) { 
+    if (tx < 0 || ty < 0 || tx >= COLS || ty >= ROWS) return true; 
+    if (grid[ty][tx] === 1) return true;
+    if (doors.some(d => d.x === tx && d.y === ty)) return true;
+    return false; 
+  }
+  
+  function aabb(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
+  
+  function rr(c, x, y, w, h, r) {
+    r = Math.min(r, w/2, h/2);
+    c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+  }
+
+  function makeBorder() {
+    for (let x = 0; x < COLS; x++) { grid[0][x] = 1; grid[ROWS-1][x] = 1; }
+    for (let y = 0; y < ROWS; y++) { grid[y][0] = 1; grid[y][COLS-1] = 1; }
+  }
+
+  function spawnParticles(x, y, color, count) {
+    for (let i = 0; i < count; i++) {
+      particles.push({ x, y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6 - 2, life: 1.0, color });
+    }
+  }
+
+  /* ================= UNDO / REDO ================= */
+  function getState() {
+    return JSON.stringify({ grid, startPos, goalPos, enemies, flyEnemies, fires, movers, switches, jumpPads, checkpoints, keysItems, doors, isDarkMode });
+  }
+  
+  function applyState(state) {
+    const d = JSON.parse(state);
+    grid = d.grid; startPos = d.startPos; goalPos = d.goalPos;
+    enemies = d.enemies; flyEnemies = d.flyEnemies; fires = d.fires;
+    movers = d.movers; switches = d.switches; jumpPads = d.jumpPads;
+    checkpoints = d.checkpoints; keysItems = d.keysItems; doors = d.doors;
+    isDarkMode = d.isDarkMode;
+    toggleDarkBtn.textContent = `🔦 Bóng tối: ${isDarkMode ? 'ON' : 'OFF'}`;
+    toggleDarkBtn.style.background = isDarkMode ? '#3b82f6' : '#1e293b';
+  }
+
+  function pushHistory() {
+    undoStack.push(getState());
+    if (undoStack.length > 50) undoStack.shift();
+    redoStack = [];
+  }
+
+  document.getElementById('undoBtn').addEventListener('click', () => {
+    if (undoStack.length === 0) return;
+    redoStack.push(getState()); applyState(undoStack.pop()); toast('Đã hoàn tác ↩');
+  });
+
+  document.getElementById('redoBtn').addEventListener('click', () => {
+    if (redoStack.length === 0) return;
+    undoStack.push(getState()); applyState(redoStack.pop()); toast('Đã làm lại ↪');
+  });
+
+  /* ================= TẠO MÀN ================= */
+  function resetLevel() {
+    grid = newGrid(); makeBorder();
+    const plats = [[4,14,5],[12,12,6],[21,10,5],[7,8,4],[16,5,6], [35,14,5], [45,10,6]];
+    for (const [sx, sy, len] of plats) for (let i = 0; i < len; i++) grid[sy][sx + i] = 1;
+      
+    startPos = { x: 2, y: ROWS - 2 }; 
+    goalPos  = { x: COLS - 5, y: ROWS - 2 };
+    
+    enemies  = [ { x: 10, y: ROWS - 2, dir: 1 }, { x: 38, y: ROWS - 2, dir: -1 } ];
+    flyEnemies = [ { x: 28, y: 8, baseY: 8, phase: 0 }, { x: 50, y: 6, baseY: 6, phase: 1.5 } ];
+    fires = [ { x: 15, y: ROWS - 2 } ];
+    
+    switches = [ 
+      { x: 6, y: ROWS - 3, state: false, isPressed: false, initialState: false, type: 'touch' },
+      { x: 24, y: ROWS - 3, state: false, isPressed: false, initialState: false, type: 'mouse' },
+      { x: 36, y: ROWS - 2, state: false, isPressed: false, initialState: false, type: 'sensor' }
+    ];
+    movers = [ 
+      { x: 8, y: ROWS - 2, dir: 0, switchPos: { x: 6, y: ROWS - 3 } },
+      { x: 26, y: ROWS - 2, dir: 3, switchPos: { x: 24, y: ROWS - 3 } },
+      { x: 42, y: ROWS - 2, dir: 1, switchPos: { x: 36, y: ROWS - 2 } } 
+    ];
+    
+    jumpPads = [ { x: 17, y: ROWS - 2 } ];
+    checkpoints = [ { x: 30, y: ROWS - 2, active: false } ];
+    keysItems = [ { x: 14, y: 13 } ];
+    doors = [ { x: 43, y: ROWS - 2 } ];
+    
+    selectedSwitch = null; isDarkMode = false;
+    toggleDarkBtn.textContent = `🔦 Bóng tối: OFF`; toggleDarkBtn.style.background = '#1e293b';
+    undoStack = []; redoStack = [];
+    toast('Đã tạo màn mẫu 📐');
+  }
+
+  function clearLevel() {
+    grid = newGrid(); makeBorder();
+    startPos = { x: 2, y: ROWS - 2 }; goalPos  = { x: COLS - 3, y: ROWS - 2 }; 
+    enemies = []; flyEnemies = []; fires = []; movers = []; switches = []; jumpPads = []; checkpoints = []; keysItems = []; doors = [];
+    isDarkMode = false; toggleDarkBtn.textContent = `🔦 Bóng tối: OFF`; toggleDarkBtn.style.background = '#1e293b';
+    undoStack = []; redoStack = [];
+    toast('Đã xóa trắng màn chơi 🗑');
+  }
+
+  /* ================= VẬT LÝ ================= */
+  function moveAxis(ent, axis) {
+    if (axis === 'x') ent.x += ent.vx; else ent.y += ent.vy;
+    const x1 = Math.floor(ent.x / TILE), x2 = Math.floor((ent.x + ent.w - 1) / TILE);
+    const y1 = Math.floor(ent.y / TILE), y2 = Math.floor((ent.y + ent.h - 1) / TILE);
+    for (let ty = y1; ty <= y2; ty++) {
+      for (let tx = x1; tx <= x2; tx++) {
+        if (!isSolid(tx, ty)) continue;
+        if (axis === 'x') {
+          if (ent.vx > 0) ent.x = tx * TILE - ent.w;
+          else if (ent.vx < 0) ent.x = (tx + 1) * TILE;
+          ent.vx = 0;
+        } else {
+          if (ent.vy > 0) { ent.y = ty * TILE - ent.h; ent.onGround = true; }
+          else if (ent.vy < 0) { ent.y = (ty + 1) * TILE; }
+          ent.vy = 0;
+        }
+        return;
+      }
+    }
+  }
+
+  /* ================= SINH THỰC THỂ ================= */
+  function makePlayer() {
+    return { x: startPos.x * TILE + (TILE - 28) / 2, y: startPos.y * TILE + (TILE - 28), w: 28, h: 28, vx: 0, vy: 0, onGround: false, facing: 1, keys: 0 };
+  }
+
+  function spawnEntities() {
+    player = makePlayer(); respawnPos = { x: startPos.x, y: startPos.y };
+    playEnemies = enemies.map(e => ({ x: e.x * TILE + (TILE - 28) / 2, y: e.y * TILE + (TILE - 28), w: 28, h: 28, vx: 0, vy: 0, dir: e.dir || 1, onGround: false }));
+    playFlyEnemies = flyEnemies.map(e => ({ x: e.x * TILE + (TILE - 28) / 2, y: e.y * TILE + (TILE - 28), w: 28, h: 28, baseY: e.baseY, phase: e.phase }));
+    
+    for (const sw of switches) { sw.initialState = sw.state; sw.isPressed = false; }
+    for (const cp of checkpoints) cp.active = false;
+    
+    win = false; coyote = 0; prevJump = false;
+    camera.x = 0; particles = []; shakeIntensity = 0;
+  }
+
+  function respawn() {
+    player.x = respawnPos.x * TILE + (TILE - 28) / 2; player.y = respawnPos.y * TILE + (TILE - 28); 
+    player.vx = 0; player.vy = 0; player.keys = 0; coyote = 0; prevJump = false;
+    for (const sw of switches) { sw.isPressed = false; sw.state = sw.initialState; }
+    shakeIntensity = 15; playSFX('hit');
+    spawnParticles(player.x + 14, player.y + 14, '#ef4444', 20);
+    toast('Bạn đã chết! Hồi sinh...');
+  }
+
+  /* ================= UPDATE ================= */
+  function update() {
+    if (!player || win) return;
+
+    const left = keys['ArrowLeft'] || keys['KeyA'];
+    const right = keys['ArrowRight'] || keys['KeyD'];
+    const jump = keys['Space'] || keys['ArrowUp'] || keys['KeyW'];
+
+    const dir = (right ? 1 : 0) - (left ? 1 : 0);
+    player.vx = dir * SPEED;
+    if (dir) player.facing = dir;
+
+    if (jump && !prevJump && (player.onGround || coyote > 0)) {
+      player.vy = JUMP; player.onGround = false; coyote = 0;
+      playSFX('jump'); spawnParticles(player.x + 14, player.y + 28, '#cbd5e1', 5);
+    }
+    if (!jump && player.vy < -4) player.vy = -4;
+    prevJump = jump;
+
+    for (const sw of switches) {
+      if (sw.type === 'touch') {
+        const swRect = { x: sw.x * TILE, y: sw.y * TILE, w: TILE, h: TILE };
+        const touching = aabb(player, swRect);
+        if (touching !== sw.isPressed) {
+          sw.isPressed = touching; sw.state = sw.isPressed ? !sw.initialState : sw.initialState;
+          if (touching) playSFX('switch');
+        }
+      } else if (sw.type === 'sensor') {
+        const swRect = { x: sw.x * TILE, y: sw.y * TILE, w: TILE, h: TILE };
+        let detected = false;
+        if (aabb(player, swRect)) detected = true;
+        if (!detected) { for (const e of playEnemies) { if (aabb(e, swRect)) { detected = true; break; } } }
+        if (!detected) { for (const e of playFlyEnemies) { if (aabb(e, swRect)) { detected = true; break; } } }
+        sw.state = detected;
+      }
+    }
+
+    let onMover = false; let moverDir = -1;
+    for (const m of movers) {
+      let isActive = true;
+      if (m.switchPos) {
+        const linkedSwitch = switches.find(s => s.x === m.switchPos.x && s.y === m.switchPos.y);
+        if (linkedSwitch && !linkedSwitch.state) isActive = false; 
+      }
+      if (isActive) {
+        const mRect = { x: m.x * TILE, y: m.y * TILE, w: TILE, h: TILE };
+        if (aabb(player, mRect)) { onMover = true; moverDir = m.dir; break; }
+      }
+    }
+    if (onMover) {
+      if (moverDir === 0) { player.vy = -MOVER_SPEED; player.onGround = false; }
+      if (moverDir === 1) { player.vx = MOVER_SPEED; }
+      if (moverDir === 2) { player.vy = MOVER_SPEED; }
+      if (moverDir === 3) { player.vx = -MOVER_SPEED; }
+    }
+
+    player.vy += GRAVITY;
+    if (player.vy > MAXFALL) player.vy = MAXFALL;
+    player.onGround = false;
+    moveAxis(player, 'x'); moveAxis(player, 'y');
+
+    if (player.onGround) coyote = 8; else if (coyote > 0) coyote--;
+    if (player.y > H + 80) { respawn(); return; }
+
+    for (const jp of jumpPads) {
+      if (aabb(player, {x: jp.x*TILE, y: jp.y*TILE, w: TILE, h: TILE})) {
+        if (player.vy >= 0) { player.vy = -17; playSFX('jump'); spawnParticles(player.x + 14, player.y + 28, '#cbd5e1', 15); }
+      }
+    }
+
+    for (const cp of checkpoints) {
+      if (!cp.active && aabb(player, {x: cp.x*TILE, y: cp.y*TILE, w: TILE, h: TILE})) {
+        checkpoints.forEach(c => c.active = false); cp.active = true;
+        respawnPos = { x: cp.x, y: cp.y };
+        playSFX('coin'); spawnParticles(cp.x*TILE + 16, cp.y*TILE + 16, '#fbbf24', 15);
+        toast('Đã lưu điểm hồi sinh! 🚩');
+      }
+    }
+
+    for (let i = keysItems.length - 1; i >= 0; i--) {
+      const k = keysItems[i];
+      if (aabb(player, {x: k.x*TILE + 8, y: k.y*TILE + 8, w: 16, h: 16})) {
+        player.keys++; playSFX('coin'); spawnParticles(k.x*TILE + 16, k.y*TILE + 16, '#fbbf24', 10); keysItems.splice(i, 1);
+      }
+    }
+    
+    for (let i = doors.length - 1; i >= 0; i--) {
+      const d = doors[i];
+      if (player.keys > 0 && aabb(player, {x: d.x*TILE, y: d.y*TILE, w: TILE, h: TILE})) {
+        player.keys--; playSFX('switch'); spawnParticles(d.x*TILE + 16, d.y*TILE + 16, '#94a3b8', 15); doors.splice(i, 1);
+        toast('Đã mở cửa! 🚪');
+      }
+    }
+
+    for (const e of playEnemies) {
+      e.vy += GRAVITY;
+      if (e.vy > MAXFALL) e.vy = MAXFALL;
+      e.vx = e.dir * 1.4; e.onGround = false;
+      moveAxis(e, 'x');
+      if (e.vx === 0) e.dir *= -1;
+      moveAxis(e, 'y');
+      if (e.onGround) {
+        const footX = e.dir > 0 ? e.x + e.w + 2 : e.x - 2;
+        const tx = Math.floor(footX / TILE);
+        const ty = Math.floor((e.y + e.h + 2) / TILE);
+        if (!isSolid(tx, ty)) e.dir *= -1;
+      }
+    }
+
+    for (const e of playFlyEnemies) {
+      e.phase += 0.03;
+      e.y = e.baseY * TILE + (TILE - 28) + Math.sin(e.phase) * 40;
+    }
+
+    for (const e of playEnemies) { if (aabb(player, e)) { respawn(); return; } }
+    for (const e of playFlyEnemies) { if (aabb(player, e)) { respawn(); return; } }
+    for (const f of fires) {
+      const fRect = { x: f.x * TILE + 6, y: f.y * TILE + 10, w: TILE - 12, h: TILE - 10 };
+      if (aabb(player, fRect)) { respawn(); return; }
+    }
+
+    if (goalPos) {
+      const g = { x: goalPos.x * TILE, y: goalPos.y * TILE, w: TILE, h: TILE };
+      if (aabb(player, g)) { win = true; playSFX('win'); toast('🏆 Bạn đã chinh phục màn chơi!'); }
+    }
+
+    let targetX = player.x - cv.width / 2;
+    targetX = Math.max(0, Math.min(targetX, W - cv.width));
+    camera.x += (targetX - camera.x) * 0.1;
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.vx *= 0.98; p.life -= 0.02;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+    
+    if (shakeIntensity > 0) shakeIntensity *= 0.9;
+    if (shakeIntensity < 0.5) shakeIntensity = 0;
+  }
+
+  /* ================= VẼ ================= */
+  function drawBlock(px, py) {
+    ctx.fillStyle = '#334155'; ctx.fillRect(px, py, TILE, TILE);
+    ctx.fillStyle = '#475569'; ctx.fillRect(px + 2, py + 2, TILE - 4, TILE - 4);
+    ctx.fillStyle = '#64748b'; ctx.fillRect(px + 2, py + 2, TILE - 4, 3);
+  }
+
+  function drawGoal(px, py) {
+    ctx.fillStyle = 'rgba(52,211,153,0.14)'; ctx.fillRect(px, py, TILE, TILE);
+    ctx.fillStyle = '#cbd5e1'; ctx.fillRect(px + 8, py + 3, 3, TILE - 7);
+    ctx.fillStyle = '#34d399'; ctx.beginPath(); ctx.moveTo(px + 11, py + 4); ctx.lineTo(px + 27, py + 10); ctx.lineTo(px + 11, py + 16); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#94a3b8'; ctx.fillRect(px + 5, py + TILE - 4, 13, 2);
+  }
+
+  function drawStart(px, py) {
+    ctx.fillStyle = 'rgba(96,165,250,0.14)'; ctx.fillRect(px, py, TILE, TILE);
+    ctx.strokeStyle = '#60a5fa'; ctx.lineWidth = 2; ctx.strokeRect(px + 3.5, py + 3.5, TILE - 7, TILE - 7);
+    ctx.fillStyle = '#60a5fa'; ctx.beginPath(); ctx.arc(px + TILE/2, py + TILE/2, 5, 0, Math.PI * 2); ctx.fill();
+  }
+
+  function drawJumpPad(px, py) {
+    ctx.fillStyle = '#1e293b'; ctx.fillRect(px + 4, py + 24, TILE - 8, 8);
+    ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(px + 6, py + 24); ctx.lineTo(px + TILE - 6, py + 20); ctx.lineTo(px + 6, py + 16);
+    ctx.lineTo(px + TILE - 6, py + 12); ctx.lineTo(px + 6, py + 8); ctx.lineTo(px + TILE - 6, py + 4); ctx.stroke();
+    ctx.fillStyle = '#cbd5e1'; ctx.fillRect(px + 4, py + 2, TILE - 8, 3);
+  }
+
+  function drawCheckpoint(px, py, active) {
+    ctx.fillStyle = '#64748b'; ctx.fillRect(px + 6, py + 4, 4, TILE - 4);
+    ctx.fillStyle = active ? '#fbbf24' : '#94a3b8'; ctx.beginPath(); ctx.moveTo(px + 10, py + 4); ctx.lineTo(px + 26, py + 10); ctx.lineTo(px + 10, py + 16); ctx.closePath(); ctx.fill();
+    if (active) { ctx.fillStyle = '#fbbf24'; ctx.beginPath(); ctx.arc(px + 8, py + 6, 3, 0, 7); ctx.fill(); }
+  }
+
+  function drawKey(px, py) {
+    ctx.fillStyle = '#fbbf24'; ctx.beginPath(); ctx.arc(px + 12, py + 16, 5, 0, Math.PI*2); ctx.fill();
+    ctx.fillRect(px + 16, py + 14, 10, 4); ctx.fillRect(px + 22, py + 18, 4, 4); ctx.fillRect(px + 18, py + 18, 2, 3);
+  }
+
+  function drawDoor(px, py) {
+    ctx.fillStyle = '#7c2d12'; ctx.fillRect(px, py, TILE, TILE);
+    ctx.fillStyle = '#9a3412'; ctx.fillRect(px + 4, py + 4, TILE - 8, TILE - 8);
+    ctx.fillStyle = '#fbbf24'; ctx.beginPath(); ctx.arc(px + 24, py + 16, 2.5, 0, 7); ctx.fill();
+  }
+
+  function drawFire(px, py, frame) {
+    const colors = { 1: '#ef4444', 2: '#f97316', 3: '#fde047' };
+    const p = (x, y, w, h, c) => { ctx.fillStyle = colors[c]; ctx.fillRect(px + x * 2, py + y * 2, w * 2, h * 2); };
+    if (frame === 0) {
+      p(5, 10, 6, 6, 1); p(4, 11, 8, 5, 1); p(6, 6, 4, 4, 1); p(7, 3, 2, 3, 1); p(8, 2, 1, 1, 1); p(3, 8, 1, 2, 1); p(6, 9, 4, 5, 2); p(7, 10, 2, 4, 3);
+    } else if (frame === 1) {
+      p(5, 11, 6, 5, 1); p(4, 12, 8, 4, 1); p(6, 7, 4, 4, 1); p(8, 4, 2, 3, 1); p(9, 3, 1, 1, 1); p(3, 9, 1, 2, 1); p(6, 10, 4, 4, 2); p(7, 11, 2, 3, 3);
+    } else {
+      p(5, 10, 6, 6, 1); p(4, 11, 8, 5, 1); p(6, 8, 4, 3, 1); p(6, 4, 2, 4, 1); p(5, 3, 1, 1, 1); p(4, 8, 1, 2, 1); p(6, 9, 4, 5, 2); p(7, 10, 2, 4, 3);
+    }
+  }
+
+  function drawEnemy(x, y, w, h, dir) {
+    rr(ctx, x, y, w, h, 6); ctx.fillStyle = '#ef4444'; ctx.fill();
+    const eyeSize = 8, eyeY = y + (h - eyeSize) / 2, eye1X = x + w/2 - eyeSize - 2, eye2X = x + w/2 + 2;
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(eye1X, eyeY, eyeSize, eyeSize); ctx.fillRect(eye2X, eyeY, eyeSize, eyeSize);
+    const pupilSize = 4, pupilOffset = (eyeSize - pupilSize) / 2, pX = dir * 1;
+    ctx.fillStyle = '#000000'; ctx.fillRect(eye1X + pupilOffset + pX, eyeY + pupilOffset, pupilSize, pupilSize); ctx.fillRect(eye2X + pupilOffset + pX, eyeY + pupilOffset, pupilSize, pupilSize);
+  }
+
+  function drawFlyEnemy(x, y, w, h) {
+    ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.moveTo(x + w/2, y); ctx.lineTo(x + w, y + h/2); ctx.lineTo(x + w/2, y + h); ctx.lineTo(x, y + h/2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(x + w/2 - 5, y + h/2 - 2, 3, 3); ctx.fillRect(x + w/2 + 2, y + h/2 - 2, 3, 3);
+    ctx.fillStyle = 'rgba(239,68,68,0.5)'; ctx.beginPath(); ctx.ellipse(x - 6, y + h/2, 8, 4, 0, 0, 7); ctx.fill(); ctx.beginPath(); ctx.ellipse(x + w + 6, y + h/2, 8, 4, 0, 0, 7); ctx.fill();
+  }
+
+  function drawPlayer() {
+    const { x, y, w, h, facing, keys: keyCount } = player;
+    rr(ctx, x, y, w, h, 6); ctx.fillStyle = '#3b82f6'; ctx.fill();
+    ctx.fillStyle = '#111827'; const eyeW = 3, eyeH = 10, eyeY = y + (h - eyeH) / 2, pOffset = facing * 1.5;
+    ctx.fillRect(x + w/2 - 5 + pOffset, eyeY, eyeW, eyeH); ctx.fillRect(x + w/2 + 2 + pOffset, eyeY, eyeW, eyeH);
+    if (keyCount > 0) { ctx.fillStyle = '#fbbf24'; ctx.font = 'bold 10px monospace'; ctx.textAlign = 'center'; ctx.fillText('🔑' + keyCount, x + w/2, y - 5); }
+  }
+
+  function drawMover(px, py, dir, isActive) {
+    ctx.globalAlpha = isActive ? 1 : 0.3; 
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)'; ctx.fillRect(px, py, TILE, TILE);
+    ctx.fillStyle = '#ffffff'; const cx = px + TILE/2, cy = py + TILE/2, size = 8, dotR = 3.5;
+    if (dir === 0) { ctx.beginPath(); ctx.moveTo(cx, cy - size); ctx.lineTo(cx + size, cy + size/2); ctx.lineTo(cx - size, cy + size/2); ctx.fill(); ctx.beginPath(); ctx.arc(cx, cy + size, dotR, 0, 7); ctx.fill(); }
+    else if (dir === 1) { ctx.beginPath(); ctx.moveTo(cx + size, cy); ctx.lineTo(cx - size/2, cy - size); ctx.lineTo(cx - size/2, cy + size); ctx.fill(); ctx.beginPath(); ctx.arc(cx - size, cy, dotR, 0, 7); ctx.fill(); }
+    else if (dir === 2) { ctx.beginPath(); ctx.moveTo(cx, cy + size); ctx.lineTo(cx + size, cy - size/2); ctx.lineTo(cx - size, cy - size/2); ctx.fill(); ctx.beginPath(); ctx.arc(cx, cy - size, dotR, 0, 7); ctx.fill(); }
+    else if (dir === 3) { ctx.beginPath(); ctx.moveTo(cx - size, cy); ctx.lineTo(cx + size/2, cy - size); ctx.lineTo(cx + size/2, cy + size); ctx.fill(); ctx.beginPath(); ctx.arc(cx + size, cy, dotR, 0, 7); ctx.fill(); }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawSwitch(px, py, state, isSelected, type) {
+    ctx.fillStyle = '#475569'; rr(ctx, px + 2, py + 20, TILE - 4, 10, 3); ctx.fill();
+    ctx.fillStyle = state ? '#22c55e' : '#ef4444'; rr(ctx, px + 2, py + 4, TILE - 4, 18, 4); ctx.fill();
+    ctx.fillStyle = state ? '#166534' : '#7f1d1d'; ctx.fillRect(px + 4, py + 18, TILE - 8, 3);
+
+    if (type === 'touch') {
+      ctx.fillStyle = '#ffffff'; ctx.font = 'bold 8px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(state ? 'ON' : 'OFF', px + TILE/2, py + 13);
+    } else if (type === 'mouse') {
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+      const cx = px + TILE/2, cy = py + 13;
+      ctx.beginPath(); ctx.arc(cx, cy, 6, -Math.PI/4, Math.PI * 1.25, false); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx, cy - 8); ctx.lineTo(cx, cy - 1); ctx.stroke();
+    } else if (type === 'sensor') {
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+      const cx = px + TILE/2, cy = py + 13;
+      ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI*2); ctx.stroke();
+      if (state) {
+        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI*2); ctx.stroke();
+      } else {
+        ctx.fillStyle = '#7f1d1d'; ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, Math.PI*2); ctx.fill();
+      }
+    }
+
+    if (isSelected) { ctx.strokeStyle = '#fde047'; ctx.lineWidth = 2; ctx.strokeRect(px + 1, py + 3, TILE - 2, 21); }
+  }
+
+  function render() {
+    ctx.fillStyle = '#0b1220'; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.save();
+    
+    if (shakeIntensity > 0) ctx.translate((Math.random()-0.5)*shakeIntensity, (Math.random()-0.5)*shakeIntensity);
+    ctx.translate(-camera.x, -camera.y);
+
+    if (mode === 'edit') {
+      ctx.strokeStyle = 'rgba(148,163,184,0.07)'; ctx.lineWidth = 1; ctx.beginPath();
+      for (let x = 1; x < COLS; x++) { ctx.moveTo(x*TILE + .5, 0); ctx.lineTo(x*TILE + .5, H); }
+      for (let y = 1; y < ROWS; y++) { ctx.moveTo(0, y*TILE + .5); ctx.lineTo(W, y*TILE + .5); }
+      ctx.stroke();
+    }
+    
+    if (mode === 'edit') {
+      ctx.strokeStyle = '#fde047'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
+      for (const m of movers) {
+        if (m.switchPos) {
+          ctx.beginPath(); ctx.moveTo(m.switchPos.x * TILE + TILE/2, m.switchPos.y * TILE + TILE/2); ctx.lineTo(m.x * TILE + TILE/2, m.y * TILE + TILE/2); ctx.stroke();
+        }
+      }
+      ctx.setLineDash([]);
+    }
+
+    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (grid[y][x]) drawBlock(x * TILE, y * TILE);
+    
+    if (goalPos) drawGoal(goalPos.x * TILE, goalPos.y * TILE);
+    if (startPos) drawStart(startPos.x * TILE, startPos.y * TILE);
+    for (const jp of jumpPads) drawJumpPad(jp.x * TILE, jp.y * TILE);
+    for (const cp of checkpoints) drawCheckpoint(cp.x * TILE, cp.y * TILE, cp.active);
+    for (const k of keysItems) drawKey(k.x * TILE, k.y * TILE);
+    for (const d of doors) drawDoor(d.x * TILE, d.y * TILE);
+
+    const fireFrame = Math.floor(performance.now() / 125) % 3;
+    for (const f of fires) drawFire(f.x * TILE, f.y * TILE, fireFrame);
+
+    for (const sw of switches) {
+      const isSel = selectedSwitch && selectedSwitch.x === sw.x && selectedSwitch.y === sw.y;
+      drawSwitch(sw.x * TILE, sw.y * TILE, sw.state, isSel, sw.type);
+    }
+    for (const m of movers) {
+      let isActive = true;
+      if (m.switchPos) {
+        const linkedSwitch = switches.find(s => s.x === m.switchPos.x && s.y === m.switchPos.y);
+        if (linkedSwitch && !linkedSwitch.state) isActive = false;
+      }
+      drawMover(m.x * TILE, m.y * TILE, m.dir, isActive);
+    }
+
+    if (mode === 'edit') {
+      for (const e of enemies) drawEnemy(e.x*TILE + (TILE-28)/2, e.y*TILE + (TILE-28), 28, 28, e.dir || 1);
+      for (const e of flyEnemies) drawFlyEnemy(e.x*TILE + (TILE-28)/2, e.y*TILE + (TILE-28), 28, 28);
+      if (hover) { ctx.strokeStyle = 'rgba(125,211,252,0.7)'; ctx.lineWidth = 2; ctx.strokeRect(hover.x*TILE + 1, hover.y*TILE + 1, TILE - 2, TILE - 2); }
+    } else {
+      for (const e of playEnemies) drawEnemy(e.x, e.y, e.w, e.h, e.dir);
+      for (const e of playFlyEnemies) drawFlyEnemy(e.x, e.y, e.w, e.h);
+      if (player) drawPlayer();
+    }
+
+    for (const p of particles) { ctx.fillStyle = p.color; ctx.globalAlpha = p.life; ctx.fillRect(p.x, p.y, 4, 4); }
+    ctx.globalAlpha = 1;
+    ctx.restore(); 
+
+    if (mode === 'play' && isDarkMode && player && !win) {
+      ctx.fillStyle = 'rgba(0,0,0,0.94)'; ctx.fillRect(0, 0, cv.width, cv.height); ctx.globalCompositeOperation = 'destination-out';
+      const pSX = player.x + player.w/2 - camera.x, pSY = player.y + player.h/2 - camera.y;
+      const grad = ctx.createRadialGradient(pSX, pSY, 10, pSX, pSY, 120);
+      grad.addColorStop(0, 'rgba(0,0,0,1)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(pSX, pSY, 120, 0, Math.PI*2); ctx.fill();
+      for (const f of fires) {
+        const fx = f.x * TILE + TILE/2 - camera.x, fy = f.y * TILE + TILE/2 - camera.y;
+        const fGrad = ctx.createRadialGradient(fx, fy, 5, fx, fy, 80);
+        fGrad.addColorStop(0, 'rgba(0,0,0,1)'); fGrad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = fGrad; ctx.beginPath(); ctx.arc(fx, fy, 80, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    if (mode === 'play' && win) {
+      ctx.fillStyle = 'rgba(2,6,23,0.8)'; ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#4ade80'; ctx.font = 'bold 62px system-ui,sans-serif';
+      ctx.fillText('CHIẾN THẮNG!', cv.width/2, cv.height/2 - 24);
+      ctx.fillStyle = '#94a3b8'; ctx.font = '19px system-ui,sans-serif';
+      ctx.fillText('Nhấn R để chơi lại  •  Esc để về Menu', cv.width/2, cv.height/2 + 48);
+    }
+  }
+
+  /* ================= VÒNG LẶP ================= */
+  let lastT = performance.now(), acc = 0;
+  function loop(t) {
+    requestAnimationFrame(loop);
+    const dt = Math.min(t - lastT, 200); lastT = t;
+    if (mode === 'edit') {
+      if (keys['ArrowRight']) camera.x += 10;
+      if (keys['ArrowLeft']) camera.x -= 10;
+      camera.x = Math.max(0, Math.min(camera.x, W - cv.width));
+    }
+    if (mode === 'play') {
+      acc += dt; let guard = 0;
+      while (acc >= STEP && guard++ < 5) { update(); acc -= STEP; }
+    } else { acc = 0; }
+    render();
+  }
+
+  /* ================= CHẾ ĐỘ CHƠI ================= */
+  function startGame() {
+    initAudio(); 
+    if (!startPos) { toast('⚠ Hãy đặt ĐIỂM BẮT ĐẦU (🟢) trước!'); return; }
+    if (!goalPos) { toast('⚠ Hãy đặt ĐÍCH CHIẾN THẮNG (🏁) trước!'); return; }
+    pushHistory(); mode = 'play'; spawnEntities();
+    selectedSwitch = null; toolPanel.classList.remove('open'); 
+    playBtn.textContent = '⏹ DỪNG'; playBtn.classList.add('danger'); cv.classList.add('playing');
+    toolBtns.forEach(b => b.disabled = true);
+    toast('Đang chơi…');
+  }
+
+  playBtn.addEventListener('click', () => { 
+    if (mode === 'edit') startGame(); 
+    else if (mode === 'play') {
+      showMenu();
+      playBtn.textContent = '▶ CHƠI'; playBtn.classList.remove('danger');
+      cv.classList.remove('playing');
+      toolBtns.forEach(b => b.disabled = false);
+      player = null; playEnemies = []; playFlyEnemies = []; win = false;
+    }
+  });
+
+  /* ================= CÔNG CỤ ================= */
+  toolBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      tool = btn.dataset.tool; if (tool !== 'wire') selectedSwitch = null;
+      toolBtns.forEach(b => b.classList.toggle('active', b === btn));
+    });
+  });
+  
+  const TOOL_KEYS = { 
+    Digit1:'block', Digit2:'erase', Digit3:'start', Digit4:'enemy', Digit5:'goal', Digit6:'fire', Digit7:'mover', Digit8:'switch', Digit9:'mouseSwitch', Digit0:'wire',
+    KeyJ:'jumpPad', KeyC:'checkpoint', KeyK:'key', KeyD:'door', KeyF:'flyEnemy', KeyT:'sensorSwitch'
+  };
+
+  /* ================= CHUỘT / CẢM ỨNG ================= */
+  function getTile(clientX, clientY) {
+    const r = cv.getBoundingClientRect();
+    const scaleX = cv.width / r.width, scaleY = cv.height / r.height;
+    const canvasX = (clientX - r.left) * scaleX + camera.x, canvasY = (clientY - r.top) * scaleY + camera.y;
+    return { x: Math.floor(canvasX / TILE), y: Math.floor(canvasY / TILE) };
+  }
+
+  function clearTile(tx, ty) {
+    grid[ty][tx] = 0; 
+    enemies = enemies.filter(e => !(e.x === tx && e.y === ty)); 
+    flyEnemies = flyEnemies.filter(e => !(e.x === tx && e.y === ty));
+    fires = fires.filter(f => !(f.x === tx && f.y === ty));
+    movers = movers.filter(m => !(m.x === tx && m.y === ty));
+    jumpPads = jumpPads.filter(j => !(j.x === tx && j.y === ty));
+    checkpoints = checkpoints.filter(c => !(c.x === tx && c.y === ty));
+    keysItems = keysItems.filter(k => !(k.x === tx && k.y === ty));
+    doors = doors.filter(d => !(d.x === tx && d.y === ty));
+    const removedSwitch = switches.find(s => s.x === tx && s.y === ty);
+    if (removedSwitch) { for (const m of movers) { if (m.switchPos && m.switchPos.x === tx && m.switchPos.y === ty) m.switchPos = null; } }
+    switches = switches.filter(s => !(s.x === tx && s.y === ty));
+    if (startPos && startPos.x === tx && startPos.y === ty) startPos = null;
+    if (goalPos && goalPos.x === tx && goalPos.y === ty) goalPos = null;
+    if (selectedSwitch && selectedSwitch.x === tx && selectedSwitch.y === ty) selectedSwitch = null;
+  }
+
+  function applyTool(tx, ty, erase) {
+    if (tx < 0 || ty < 0 || tx >= COLS || ty >= ROWS) return;
+    if (tool === 'erase' || erase) { clearTile(tx, ty); return; }
+
+    switch (tool) {
+      case 'block': clearTile(tx, ty); grid[ty][tx] = 1; break;
+      case 'start': clearTile(tx, ty); startPos = { x: tx, y: ty }; break;
+      case 'goal': clearTile(tx, ty); goalPos = { x: tx, y: ty }; break;
+      case 'jumpPad': if (!jumpPads.some(j => j.x===tx && j.y===ty)) { clearTile(tx, ty); jumpPads.push({x:tx, y:ty}); } break;
+      case 'checkpoint': if (!checkpoints.some(c => c.x===tx && c.y===ty)) { clearTile(tx, ty); checkpoints.push({x:tx, y:ty, active:false}); } break;
+      case 'key': if (!keysItems.some(k => k.x===tx && k.y===ty)) { clearTile(tx, ty); keysItems.push({x:tx, y:ty}); } break;
+      case 'door': if (!doors.some(d => d.x===tx && d.y===ty)) { clearTile(tx, ty); doors.push({x:tx, y:ty}); } break;
+      case 'enemy': if (!enemies.some(e => e.x===tx && e.y===ty)) { clearTile(tx, ty); enemies.push({x:tx, y:ty, dir:1}); } break;
+      case 'flyEnemy': if (!flyEnemies.some(e => e.x===tx && e.y===ty)) { clearTile(tx, ty); flyEnemies.push({x:tx, y:ty, baseY:ty, phase:Math.random()*6}); } break;
+      case 'fire': if (!fires.some(f => f.x===tx && f.y===ty)) { clearTile(tx, ty); fires.push({x:tx, y:ty}); } break;
+      case 'mover': if (!movers.some(m => m.x===tx && m.y===ty)) { clearTile(tx, ty); movers.push({x:tx, y:ty, dir:1, switchPos:null}); } break;
+      
+      case 'switch':
+      case 'mouseSwitch':
+      case 'sensorSwitch':
+        const existingSw = switches.find(s => s.x === tx && s.y === ty);
+        if (existingSw) { existingSw.state = !existingSw.state; existingSw.initialState = existingSw.state; } 
+        else {
+          clearTile(tx, ty); 
+          const type = tool === 'switch' ? 'touch' : (tool === 'mouseSwitch' ? 'mouse' : 'sensor');
+          switches.push({ x: tx, y: ty, state: false, isPressed: false, initialState: false, type: type });
+        }
+        break;
+        
+      case 'wire':
+        const sw = switches.find(s => s.x === tx && s.y === ty);
+        if (sw) { selectedSwitch = { x: sw.x, y: sw.y }; toast('Đã chọn nút, click vào Khối di chuyển!'); return; }
+        const mv = movers.find(m => m.x === tx && m.y === ty);
+        if (mv && selectedSwitch) { mv.switchPos = { x: selectedSwitch.x, y: selectedSwitch.y }; selectedSwitch = null; toast('Đã nối dây! 🔌'); return; }
+        break;
+    }
+  }
+
+  cv.addEventListener('pointerdown', e => {
+    if (mode === 'menu') return;
+
+    if (mode !== 'edit') {
+      if (mode === 'play' && e.button === 0) {
+        const { x, y } = getTile(e.clientX, e.clientY);
+        const sw = switches.find(s => s.x === x && s.y === y && s.type === 'mouse');
+        if (sw && !sw.isPressed) { sw.isPressed = true; sw.state = !sw.initialState; playSFX('switch'); }
+      }
+      return;
+    }
+    e.preventDefault(); cv.setPointerCapture(e.pointerId); painting = true;
+    pushHistory();
+    const { x, y } = getTile(e.clientX, e.clientY); applyTool(x, y, e.button === 2);
+  });
+  
+  cv.addEventListener('pointermove', e => {
+    if (mode === 'menu') return;
+    const { x, y } = getTile(e.clientX, e.clientY);
+    hover = (x >= 0 && y >= 0 && x < COLS && y < ROWS) ? { x, y } : null;
+    if (!painting || mode !== 'edit') return;
+    if (tool === 'block' || tool === 'erase') applyTool(x, y, e.buttons === 2 || e.pointerType === 'touch' && e.buttons === 0);
+  });
+
+  window.addEventListener('pointerup', e => {
+    painting = false;
+    if (mode === 'play') {
+      for (const sw of switches) { if (sw.type === 'mouse' && sw.isPressed) { sw.isPressed = false; sw.state = sw.initialState; } }
+    }
+  });
+
+  cv.addEventListener('pointercancel', () => { painting = false; });
+  cv.addEventListener('pointerleave', () => { hover = null; });
+  cv.addEventListener('contextmenu', e => e.preventDefault());
+
+  /* ================= BÀN PHÍM ================= */
+  window.addEventListener('keydown', e => {
+    if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code)) e.preventDefault();
+    keys[e.code] = true;
+    
+    if (e.ctrlKey && e.code === 'KeyZ') { document.getElementById('undoBtn').click(); return; }
+    if (e.ctrlKey && e.code === 'KeyY') { document.getElementById('redoBtn').click(); return; }
+    
+    if (e.code === 'Escape') {
+      if (mode === 'play') { menuBtn.click(); }
+      else if (mode === 'edit') { showMenu(); }
+      return;
+    }
+
+    if (mode === 'play') {
+      if (e.code === 'KeyR') { spawnEntities(); toast('Chơi lại từ đầu 🔄'); }
+    } else if (mode === 'edit') {
+      if (TOOL_KEYS[e.code]) {
+        tool = TOOL_KEYS[e.code]; if (tool !== 'wire') selectedSwitch = null;
+        toolBtns.forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
+      }
+      if (e.code === 'KeyR' && tool === 'mover' && hover) {
+        const m = movers.find(m => m.x === hover.x && m.y === hover.y);
+        if (m) { m.dir = (m.dir + 1) % 4; toast('Đã xoay hướng khối di chuyển'); }
+      }
+    }
+  });
+  window.addEventListener('keyup', e => { keys[e.code] = false; });
+  window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+
+  /* ================= LƯU / TẢI ================= */
+  const KEY = 'platformer-level-ultimate';
+  document.getElementById('saveBtn').addEventListener('click', () => {
+    try { localStorage.setItem(KEY, getState()); toast('💾 Đã lưu màn chơi!'); } catch (err) { toast('⚠ Không lưu được.'); }
+  });
+  document.getElementById('loadBtn').addEventListener('click', () => {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) { toast('⚠ Chưa có màn chơi nào được lưu.'); return; }
+    try { pushHistory(); applyState(raw); selectedSwitch = null; toast('📂 Đã tải màn chơi!'); } 
+    catch (err) { toast('⚠ Dữ liệu lưu bị lỗi.'); }
+  });
+  document.getElementById('sampleBtn').addEventListener('click', () => { pushHistory(); resetLevel(); });
+  document.getElementById('clearBtn').addEventListener('click', () => { pushHistory(); clearLevel(); });
+
+  /* ================= THÔNG BÁO ================= */
+  let toastTimer = null;
+  function toast(msg) {
+    statusEl.textContent = msg; statusEl.classList.remove('hidden');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => statusEl.classList.add('hidden'), 2500);
+  }
+
+  /* ================= KHỞI ĐỘNG ================= */
+  resetLevel();
+  camera.x = 0;
+  showMenu();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
