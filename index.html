@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
@@ -209,7 +209,7 @@
   .modal-actions .cancel { background: #334155; color: #cbd5e1; }
   .modal-actions .send { background: #16a34a; color: #fff; }
 
-  /* ================= ĐIỀU KHIỂN MOBILE (JOYSTICK) ================= */
+  /* ================= ĐIỀU KHIỂN MOBILE (JOYSTICK + R) ================= */
   #mobileControls {
     display: none;
     position: fixed; bottom: 20px; left: 0; width: 100%; padding: 0 20px;
@@ -217,7 +217,6 @@
     justify-content: space-between; align-items: flex-end;
   }
   
-  /* Vùng Joystick bên trái */
   #joystickZone {
     width: 120px; height: 120px;
     background: rgba(15, 23, 42, 0.5);
@@ -235,24 +234,38 @@
     transition: transform 0.1s;
   }
 
-  /* Nút Nhảy bên phải */
+  #mobileRightControls {
+    display: flex; flex-direction: column; gap: 15px; align-items: center;
+    pointer-events: auto; margin-right: 10px;
+  }
+
+  #btnRotate {
+    width: 60px; height: 60px; border-radius: 50%;
+    background: rgba(245, 158, 11, 0.6); /* Màu cam cho nút xoay */
+    color: #fff; border: 3px solid #fbbf24;
+    font-size: 20px; display: none; /* Mặc định ẩn, chỉ hiện khi Edit */
+    justify-content: center; align-items: center;
+    touch-action: none; -webkit-tap-highlight-color: transparent;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+  }
+  #btnRotate:active { background: #f59e0b; transform: scale(0.95); }
+
   #btnJump {
     width: 80px; height: 80px; border-radius: 50%; 
     background: rgba(22, 163, 74, 0.6);
     color: #fff; border: 3px solid #22c55e; 
     font-size: 16px; font-weight: bold;
-    pointer-events: auto; display: flex; justify-content: center; align-items: center;
+    display: flex; justify-content: center; align-items: center;
     touch-action: none; -webkit-tap-highlight-color: transparent; text-transform: uppercase;
     box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-    margin-right: 10px;
   }
   #btnJump:active { background: #22c55e; transform: scale(0.95); }
 
-  /* Hiển thị trên thiết bị di động */
   @media (pointer: coarse) or (max-width: 768px) {
     body { cursor: auto; }
     canvas { cursor: auto; }
     #mobileControls.active { display: flex; }
+    #mobileControls.active #btnRotate { display: flex; } /* Hiển thị nút xoay trên mobile */
     #feedbackContainer { bottom: 160px; right: 15px; }
     #fsBtn { display: none; }
     #menuBtn { left: 120px; padding: 8px 12px; font-size: 14px; }
@@ -283,12 +296,15 @@
 <button id="toggleToolBtn" class="hidden">⚙️</button>
 <button id="fsBtn" class="hidden">⛶ TOÀN MÀN HÌNH</button>
 
-<!-- Điều khiển Mobile: Joystick + Jump -->
+<!-- Điều khiển Mobile: Joystick + Jump + Rotate -->
 <div id="mobileControls">
   <div id="joystickZone">
     <div id="joystickKnob"></div>
   </div>
-  <button id="btnJump">Nhảy</button>
+  <div id="mobileRightControls">
+    <button id="btnRotate" title="Xoay khối đang chọn">🔄</button>
+    <button id="btnJump">Nhảy</button>
+  </div>
 </div>
 
 <div id="feedbackContainer" class="hidden">
@@ -319,6 +335,15 @@
   <div class="row">
     <button id="undoBtn" class="tool-btn" style="background:#475569; color:#fff;">↩ Undo (Ctrl+Z)</button>
     <button id="redoBtn" class="tool-btn" style="background:#475569; color:#fff;">↪ Redo (Ctrl+Y)</button>
+  </div>
+
+  <div class="group-title">Trọng lực [N]</div>
+  <div class="row" style="align-items: center;">
+    <button id="gravityToggle" class="tool-btn" style="background:#ef4444; color:#fff;">TẮT</button>
+    <button data-gdir="0" class="tool-btn g-dir-btn active" style="flex:0 0 30px;">⬇</button>
+    <button data-gdir="1" class="tool-btn g-dir-btn" style="flex:0 0 30px;">⬆</button>
+    <button data-gdir="2" class="tool-btn g-dir-btn" style="flex:0 0 30px;">⬅</button>
+    <button data-gdir="3" class="tool-btn g-dir-btn" style="flex:0 0 30px;">➡</button>
   </div>
 
   <div class="group-title">Địa hình & Vật phẩm</div>
@@ -366,7 +391,7 @@
   <div class="divider"></div>
   <div class="group-title" style="font-size: 10px; line-height: 1.4; color: #94a3b8;">
     * <b>Camera:</b> Dùng phím mũi tên Trái/Phải để di chuyển camera khi Sửa.<br>
-    * <b>Nối dây:</b> Chọn Dây điện (0), click vào Nút, sau đó click vào Khối di chuyển.
+    * <b>Xoay khối:</b> Cầm bút Di chuyển, bấm R (hoặc nút 🔄 trên mobile).
   </div>
 </div>
 
@@ -434,10 +459,17 @@
   let selectedSwitch = null;
   let isDarkMode = false;
 
+  // Trọng lực
+  let gravityActive = false;
+  let gravityDir = 0; // 0: Xuống, 1: Lên, 2: Trái, 3: Phải
+
   let camera = { x: 0, y: 0 };
   let particles = [];
   let shakeIntensity = 0;
   let undoStack = [], redoStack = [];
+
+  // Cho Mobile Rotate
+  let lastTappedTile = null;
 
   const keys = Object.create(null);
 
@@ -454,6 +486,46 @@
   const mobileControls = document.getElementById('mobileControls');
   const feedbackContainer = document.getElementById('feedbackContainer');
   const fsBtn = document.getElementById('fsBtn');
+
+  // Gravity UI
+  const gravityToggleBtn = document.getElementById('gravityToggle');
+  const gDirBtns = [...document.querySelectorAll('.g-dir-btn')];
+
+  function updateGravityUI() {
+    gravityToggleBtn.textContent = gravityActive ? 'BẬT' : 'TẮT';
+    gravityToggleBtn.style.background = gravityActive ? '#22c55e' : '#ef4444';
+    gDirBtns.forEach(btn => {
+      btn.classList.toggle('active', parseInt(btn.dataset.gdir) === gravityDir);
+      btn.style.opacity = gravityActive ? '1' : '0.5';
+    });
+  }
+
+  gravityToggleBtn.addEventListener('click', () => {
+    gravityActive = !gravityActive;
+    updateGravityUI();
+    toast(gravityActive ? 'Đã bật Trọng lực [N]' : 'Đã tắt Trọng lực');
+  });
+
+  gDirBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      gravityDir = parseInt(btn.dataset.gdir);
+      updateGravityUI();
+    });
+  });
+
+  // Rotate Mobile
+  document.getElementById('btnRotate').addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    if (mode !== 'edit' || !lastTappedTile) { toast('Hãy chạm vào khối di chuyển trước!'); return; }
+    const m = movers.find(m => m.x === lastTappedTile.x && m.y === lastTappedTile.y);
+    if (m) {
+      m.dir = (m.dir + 1) % 4;
+      toast('Đã xoay hướng khối di chuyển 🔄');
+      playSFX('switch');
+    } else {
+      toast('Không tìm thấy khối di chuyển ở ô này!');
+    }
+  });
 
   toggleDarkBtn.addEventListener('click', () => {
     isDarkMode = !isDarkMode;
@@ -504,31 +576,14 @@
     feedbackContainer.classList.remove('hidden');
     fsBtn.classList.remove('hidden');
     
-    // Chỉ bật mobileControls nếu là thiết bị di động
     if (window.innerWidth <= 768 || 'ontouchstart' in window) {
       mobileControls.classList.add('active');
     }
   }
 
-  document.getElementById('menuPlayBtn').addEventListener('click', () => {
-    hideMenu();
-    startGame();
-  });
-
-  document.getElementById('menuEditBtn').addEventListener('click', () => {
-    hideMenu();
-    mode = 'edit';
-    camera.x = 0;
-    toast('Đã vào chế độ Chỉnh sửa ✏️');
-  });
-
-  document.getElementById('menuSampleBtn').addEventListener('click', () => {
-    resetLevel();
-    hideMenu();
-    mode = 'edit';
-    camera.x = 0;
-    toast('Đã tải màn mẫu 📐');
-  });
+  document.getElementById('menuPlayBtn').addEventListener('click', () => { hideMenu(); startGame(); });
+  document.getElementById('menuEditBtn').addEventListener('click', () => { hideMenu(); mode = 'edit'; camera.x = 0; toast('Đã vào chế độ Chỉnh sửa ✏️'); });
+  document.getElementById('menuSampleBtn').addEventListener('click', () => { resetLevel(); hideMenu(); mode = 'edit'; camera.x = 0; toast('Đã tải màn mẫu 📐'); });
 
   menuBtn.addEventListener('click', () => {
     if (mode === 'play') {
@@ -545,11 +600,10 @@
   const joystickKnob = document.getElementById('joystickKnob');
   let joystickActive = false;
   let joystickCenter = { x: 0, y: 0 };
-  const maxDist = 35; // Khoảng cách tối đa cần gạt có thể di chuyển
+  const maxDist = 35;
 
   joystickZone.addEventListener('pointerdown', e => {
-    e.preventDefault();
-    joystickActive = true;
+    e.preventDefault(); joystickActive = true;
     const rect = joystickZone.getBoundingClientRect();
     joystickCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
     updateJoystick(e.clientX, e.clientY);
@@ -557,90 +611,54 @@
   });
 
   joystickZone.addEventListener('pointermove', e => {
-    if (!joystickActive) return;
-    e.preventDefault();
-    updateJoystick(e.clientX, e.clientY);
+    if (!joystickActive) return; e.preventDefault(); updateJoystick(e.clientX, e.clientY);
   });
 
-  joystickZone.addEventListener('pointerup', e => {
-    joystickActive = false;
-    joystickKnob.style.transform = `translate(0px, 0px)`;
-    keys['ArrowLeft'] = false;
-    keys['ArrowRight'] = false;
-  });
-  
-  joystickZone.addEventListener('pointercancel', e => {
-    joystickActive = false;
-    joystickKnob.style.transform = `translate(0px, 0px)`;
-    keys['ArrowLeft'] = false;
-    keys['ArrowRight'] = false;
-  });
+  const resetJoystick = () => {
+    joystickActive = false; joystickKnob.style.transform = `translate(0px, 0px)`;
+    keys['ArrowLeft'] = false; keys['ArrowRight'] = false; keys['ArrowUp'] = false; keys['ArrowDown'] = false;
+  };
+  joystickZone.addEventListener('pointerup', resetJoystick);
+  joystickZone.addEventListener('pointercancel', resetJoystick);
 
   function updateJoystick(clientX, clientY) {
-    let dx = clientX - joystickCenter.x;
-    let dy = clientY - joystickCenter.y;
+    let dx = clientX - joystickCenter.x, dy = clientY - joystickCenter.y;
     const distance = Math.sqrt(dx*dx + dy*dy);
-
-    // Giới hạn khoảng cách của cần gạt
-    if (distance > maxDist) {
-      dx = (dx / distance) * maxDist;
-      dy = (dy / distance) * maxDist;
-    }
-
+    if (distance > maxDist) { dx = (dx / distance) * maxDist; dy = (dy / distance) * maxDist; }
     joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
 
-    // Xác định hướng (chỉ quan tâm trục X cho platformer 2D)
     const deadzone = 10;
     keys['ArrowLeft'] = dx < -deadzone;
     keys['ArrowRight'] = dx > deadzone;
+    keys['ArrowUp'] = dy < -deadzone;
+    keys['ArrowDown'] = dy > deadzone;
   }
 
-  document.getElementById('btnJump').addEventListener('pointerdown', e => {
-    e.preventDefault(); keys['Space'] = true;
-  });
-  document.getElementById('btnJump').addEventListener('pointerup', e => {
-    e.preventDefault(); keys['Space'] = false;
-  });
-  document.getElementById('btnJump').addEventListener('pointercancel', e => {
-    e.preventDefault(); keys['Space'] = false;
-  });
-  document.getElementById('btnJump').addEventListener('pointerleave', e => {
-    e.preventDefault(); keys['Space'] = false;
-  });
+  document.getElementById('btnJump').addEventListener('pointerdown', e => { e.preventDefault(); keys['Space'] = true; });
+  document.getElementById('btnJump').addEventListener('pointerup', e => { e.preventDefault(); keys['Space'] = false; });
+  document.getElementById('btnJump').addEventListener('pointercancel', e => { e.preventDefault(); keys['Space'] = false; });
+  document.getElementById('btnJump').addEventListener('pointerleave', e => { e.preventDefault(); keys['Space'] = false; });
 
   /* ================= TIỆN ÍCH ================= */
   function newGrid() { return Array.from({length: ROWS}, () => new Array(COLS).fill(0)); }
-  
   function isSolid(tx, ty) { 
     if (tx < 0 || ty < 0 || tx >= COLS || ty >= ROWS) return true; 
     if (grid[ty][tx] === 1) return true;
     if (doors.some(d => d.x === tx && d.y === ty)) return true;
     return false; 
   }
-  
   function aabb(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
-  
   function rr(c, x, y, w, h, r) {
     r = Math.min(r, w/2, h/2);
     c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
   }
-
-  function makeBorder() {
-    for (let x = 0; x < COLS; x++) { grid[0][x] = 1; grid[ROWS-1][x] = 1; }
-    for (let y = 0; y < ROWS; y++) { grid[y][0] = 1; grid[y][COLS-1] = 1; }
-  }
-
-  function spawnParticles(x, y, color, count) {
-    for (let i = 0; i < count; i++) {
-      particles.push({ x, y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6 - 2, life: 1.0, color });
-    }
-  }
+  function makeBorder() { for (let x = 0; x < COLS; x++) { grid[0][x] = 1; grid[ROWS-1][x] = 1; } for (let y = 0; y < ROWS; y++) { grid[y][0] = 1; grid[y][COLS-1] = 1; } }
+  function spawnParticles(x, y, color, count) { for (let i = 0; i < count; i++) { particles.push({ x, y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6 - 2, life: 1.0, color }); } }
 
   /* ================= UNDO / REDO ================= */
   function getState() {
-    return JSON.stringify({ grid, startPos, goalPos, enemies, flyEnemies, fires, movers, switches, jumpPads, checkpoints, keysItems, doors, isDarkMode });
+    return JSON.stringify({ grid, startPos, goalPos, enemies, flyEnemies, fires, movers, switches, jumpPads, checkpoints, keysItems, doors, isDarkMode, gravityActive, gravityDir });
   }
-  
   function applyState(state) {
     const d = JSON.parse(state);
     grid = d.grid; startPos = d.startPos; goalPos = d.goalPos;
@@ -648,25 +666,16 @@
     movers = d.movers; switches = d.switches; jumpPads = d.jumpPads;
     checkpoints = d.checkpoints; keysItems = d.keysItems; doors = d.doors;
     isDarkMode = d.isDarkMode;
+    gravityActive = d.gravityActive || false;
+    gravityDir = d.gravityDir || 0;
+    
     toggleDarkBtn.textContent = `🔦 Bóng tối: ${isDarkMode ? 'ON' : 'OFF'}`;
     toggleDarkBtn.style.background = isDarkMode ? '#3b82f6' : '#1e293b';
+    updateGravityUI();
   }
-
-  function pushHistory() {
-    undoStack.push(getState());
-    if (undoStack.length > 50) undoStack.shift();
-    redoStack = [];
-  }
-
-  document.getElementById('undoBtn').addEventListener('click', () => {
-    if (undoStack.length === 0) return;
-    redoStack.push(getState()); applyState(undoStack.pop()); toast('Đã hoàn tác ↩');
-  });
-
-  document.getElementById('redoBtn').addEventListener('click', () => {
-    if (redoStack.length === 0) return;
-    undoStack.push(getState()); applyState(redoStack.pop()); toast('Đã làm lại ↪');
-  });
+  function pushHistory() { undoStack.push(getState()); if (undoStack.length > 50) undoStack.shift(); redoStack = []; }
+  document.getElementById('undoBtn').addEventListener('click', () => { if (undoStack.length === 0) return; redoStack.push(getState()); applyState(undoStack.pop()); toast('Đã hoàn tác ↩'); });
+  document.getElementById('redoBtn').addEventListener('click', () => { if (redoStack.length === 0) return; undoStack.push(getState()); applyState(redoStack.pop()); toast('Đã làm lại ↪'); });
 
   /* ================= TẠO MÀN ================= */
   function resetLevel() {
@@ -698,7 +707,9 @@
     doors = [ { x: 43, y: ROWS - 2 } ];
     
     selectedSwitch = null; isDarkMode = false;
+    gravityActive = false; gravityDir = 0;
     toggleDarkBtn.textContent = `🔦 Bóng tối: OFF`; toggleDarkBtn.style.background = '#1e293b';
+    updateGravityUI();
     undoStack = []; redoStack = [];
     toast('Đã tạo màn mẫu 📐');
   }
@@ -707,7 +718,9 @@
     grid = newGrid(); makeBorder();
     startPos = { x: 2, y: ROWS - 2 }; goalPos  = { x: COLS - 3, y: ROWS - 2 }; 
     enemies = []; flyEnemies = []; fires = []; movers = []; switches = []; jumpPads = []; checkpoints = []; keysItems = []; doors = [];
-    isDarkMode = false; toggleDarkBtn.textContent = `🔦 Bóng tối: OFF`; toggleDarkBtn.style.background = '#1e293b';
+    isDarkMode = false; gravityActive = false; gravityDir = 0;
+    toggleDarkBtn.textContent = `🔦 Bóng tối: OFF`; toggleDarkBtn.style.background = '#1e293b';
+    updateGravityUI();
     undoStack = []; redoStack = [];
     toast('Đã xóa trắng màn chơi 🗑');
   }
@@ -717,16 +730,19 @@
     if (axis === 'x') ent.x += ent.vx; else ent.y += ent.vy;
     const x1 = Math.floor(ent.x / TILE), x2 = Math.floor((ent.x + ent.w - 1) / TILE);
     const y1 = Math.floor(ent.y / TILE), y2 = Math.floor((ent.y + ent.h - 1) / TILE);
+    
     for (let ty = y1; ty <= y2; ty++) {
       for (let tx = x1; tx <= x2; tx++) {
         if (!isSolid(tx, ty)) continue;
+        
         if (axis === 'x') {
           if (ent.vx > 0) ent.x = tx * TILE - ent.w;
           else if (ent.vx < 0) ent.x = (tx + 1) * TILE;
           ent.vx = 0;
+          ent.onGround = true; // Nếu trọng lực ngang, chạm tường coi như chạm đất
         } else {
           if (ent.vy > 0) { ent.y = ty * TILE - ent.h; ent.onGround = true; }
-          else if (ent.vy < 0) { ent.y = (ty + 1) * TILE; }
+          else if (ent.vy < 0) { ent.y = (ty + 1) * TILE; ent.onGround = true; } // Nếu bay lên chạm trần cũng nhảy đc
           ent.vy = 0;
         }
         return;
@@ -766,19 +782,42 @@
 
     const left = keys['ArrowLeft'] || keys['KeyA'];
     const right = keys['ArrowRight'] || keys['KeyD'];
-    const jump = keys['Space'] || keys['ArrowUp'] || keys['KeyW'];
+    const up = keys['ArrowUp'] || keys['KeyW'];
+    const down = keys['ArrowDown'] || keys['KeyS'];
+    const jump = keys['Space'];
 
-    const dir = (right ? 1 : 0) - (left ? 1 : 0);
-    player.vx = dir * SPEED;
-    if (dir) player.facing = dir;
-
-    if (jump && !prevJump && (player.onGround || coyote > 0)) {
-      player.vy = JUMP; player.onGround = false; coyote = 0;
-      playSFX('jump'); spawnParticles(player.x + 14, player.y + 28, '#cbd5e1', 5);
+    // Xác định hướng di chuyển dựa vào trọng lực (nếu có)
+    let moveDirX = 0, moveDirY = 0;
+    if (!gravityActive || gravityDir === 0 || gravityDir === 1) {
+      moveDirX = (right ? 1 : 0) - (left ? 1 : 0);
+      moveDirY = (down ? 1 : 0) - (up ? 1 : 0); // Chỉ dùng để leo tường nếu trọng lực ngang
+    } else {
+      // Trọng lực ngang: Dùng lên/xuống để di chuyển trái/phải, trái/phải để nhảy
+      moveDirY = (right ? 1 : 0) - (left ? 1 : 0); 
+      moveDirX = (down ? 1 : 0) - (up ? 1 : 0);
     }
-    if (!jump && player.vy < -4) player.vy = -4;
+
+    player.vx = moveDirX * SPEED;
+    player.vy = moveDirY * SPEED;
+    if (moveDirX) player.facing = moveDirX;
+    if (moveDirY) player.facing = moveDirY;
+
+    // Logic Nhảy (ngược hướng trọng lực)
+    if (jump && !prevJump && (player.onGround || coyote > 0)) {
+      player.onGround = false; coyote = 0;
+      playSFX('jump'); spawnParticles(player.x + 14, player.y + 14, '#cbd5e1', 5);
+      
+      if (!gravityActive || gravityDir === 0) player.vy = JUMP; // Nhảy lên
+      else if (gravityDir === 1) player.vy = -JUMP; // Nhảy xuống
+      else if (gravityDir === 2) player.vx = -JUMP; // Nhảy sang phải
+      else if (gravityDir === 3) player.vx = JUMP;  // Nhảy sang trái
+    }
+    if (!jump && player.vy < -4 && (!gravityActive || gravityDir === 0)) player.vy = -4;
+    if (!jump && player.vy > 4 && gravityDir === 1) player.vy = 4;
+    
     prevJump = jump;
 
+    // === CÔNG TẮC ===
     for (const sw of switches) {
       if (sw.type === 'touch') {
         const swRect = { x: sw.x * TILE, y: sw.y * TILE, w: TILE, h: TILE };
@@ -797,6 +836,7 @@
       }
     }
 
+    // === KHỐI DI CHUYỂN ===
     let onMover = false; let moverDir = -1;
     for (const m of movers) {
       let isActive = true;
@@ -816,36 +856,55 @@
       if (moverDir === 3) { player.vx = -MOVER_SPEED; }
     }
 
-    player.vy += GRAVITY;
+    // === ÁP DỤNG TRỌNG LỰC ===
+    if (gravityActive) {
+      if (gravityDir === 0) player.vy += GRAVITY;
+      else if (gravityDir === 1) player.vy -= GRAVITY;
+      else if (gravityDir === 2) player.vx -= GRAVITY;
+      else if (gravityDir === 3) player.vx += GRAVITY;
+    } else {
+      player.vy += GRAVITY;
+    }
+
+    // Giới hạn tốc độ rơi
     if (player.vy > MAXFALL) player.vy = MAXFALL;
+    if (player.vy < -MAXFALL) player.vy = -MAXFALL;
+    if (player.vx > MAXFALL) player.vx = MAXFALL;
+    if (player.vx < -MAXFALL) player.vx = -MAXFALL;
+
     player.onGround = false;
     moveAxis(player, 'x'); moveAxis(player, 'y');
 
     if (player.onGround) coyote = 8; else if (coyote > 0) coyote--;
-    if (player.y > H + 80) { respawn(); return; }
+    
+    // Kiểm tra rơi ra khỏi màn hình (bất kể hướng nào)
+    if (player.y > H + 80 || player.y < -80 || player.x > W + 80 || player.x < -80) { respawn(); return; }
 
+    // Bàn nhảy
     for (const jp of jumpPads) {
       if (aabb(player, {x: jp.x*TILE, y: jp.y*TILE, w: TILE, h: TILE})) {
-        if (player.vy >= 0) { player.vy = -17; playSFX('jump'); spawnParticles(player.x + 14, player.y + 28, '#cbd5e1', 15); }
+        if (!gravityActive || gravityDir === 0) player.vy = -17;
+        else if (gravityDir === 1) player.vy = 17;
+        else if (gravityDir === 2) player.vx = 17;
+        else if (gravityDir === 3) player.vx = -17;
+        playSFX('jump'); spawnParticles(player.x + 14, player.y + 14, '#cbd5e1', 15);
       }
     }
 
+    // Checkpoint & Items
     for (const cp of checkpoints) {
       if (!cp.active && aabb(player, {x: cp.x*TILE, y: cp.y*TILE, w: TILE, h: TILE})) {
         checkpoints.forEach(c => c.active = false); cp.active = true;
-        respawnPos = { x: cp.x, y: cp.y };
-        playSFX('coin'); spawnParticles(cp.x*TILE + 16, cp.y*TILE + 16, '#fbbf24', 15);
+        respawnPos = { x: cp.x, y: cp.y }; playSFX('coin'); spawnParticles(cp.x*TILE + 16, cp.y*TILE + 16, '#fbbf24', 15);
         toast('Đã lưu điểm hồi sinh! 🚩');
       }
     }
-
     for (let i = keysItems.length - 1; i >= 0; i--) {
       const k = keysItems[i];
       if (aabb(player, {x: k.x*TILE + 8, y: k.y*TILE + 8, w: 16, h: 16})) {
         player.keys++; playSFX('coin'); spawnParticles(k.x*TILE + 16, k.y*TILE + 16, '#fbbf24', 10); keysItems.splice(i, 1);
       }
     }
-    
     for (let i = doors.length - 1; i >= 0; i--) {
       const d = doors[i];
       if (player.keys > 0 && aabb(player, {x: d.x*TILE, y: d.y*TILE, w: TILE, h: TILE})) {
@@ -854,24 +913,62 @@
       }
     }
 
+    // Kẻ địch
     for (const e of playEnemies) {
-      e.vy += GRAVITY;
-      if (e.vy > MAXFALL) e.vy = MAXFALL;
-      e.vx = e.dir * 1.4; e.onGround = false;
-      moveAxis(e, 'x');
-      if (e.vx === 0) e.dir *= -1;
-      moveAxis(e, 'y');
+      if (gravityActive) {
+        if (gravityDir === 0) e.vy += GRAVITY;
+        else if (gravityDir === 1) e.vy -= GRAVITY;
+        else if (gravityDir === 2) e.vx -= GRAVITY;
+        else if (gravityDir === 3) e.vx += GRAVITY;
+      } else {
+        e.vy += GRAVITY;
+      }
+      if (e.vy > MAXFALL) e.vy = MAXFALL; if (e.vy < -MAXFALL) e.vy = -MAXFALL;
+      if (e.vx > MAXFALL) e.vx = MAXFALL; if (e.vx < -MAXFALL) e.vx = -MAXFALL;
+      
+      // Di chuyển quái đi bộ (nếu trọng lực lên/xuống thì đi ngang, nếu trọng lực ngang thì đi dọc)
+      if (!gravityActive || gravityDir === 0 || gravityDir === 1) e.vx = e.dir * 1.4;
+      else e.vy = e.dir * 1.4;
+
+      e.onGround = false;
+      moveAxis(e, 'x'); moveAxis(e, 'y');
+      
       if (e.onGround) {
-        const footX = e.dir > 0 ? e.x + e.w + 2 : e.x - 2;
-        const tx = Math.floor(footX / TILE);
-        const ty = Math.floor((e.y + e.h + 2) / TILE);
-        if (!isSolid(tx, ty)) e.dir *= -1;
+        if (!gravityActive || gravityDir === 0 || gravityDir === 1) {
+          const footX = e.dir > 0 ? e.x + e.w + 2 : e.x - 2;
+          const tx = Math.floor(footX / TILE);
+          const ty = Math.floor((e.y + e.h + 2) / TILE);
+          if (!isSolid(tx, ty)) e.dir *= -1;
+        } else {
+          const footY = e.dir > 0 ? e.y + e.h + 2 : e.y - 2;
+          const tx = Math.floor((e.x + e.w + 2) / TILE);
+          const ty = Math.floor(footY / TILE);
+          if (!isSolid(tx, ty)) e.dir *= -1;
+        }
       }
     }
 
+    // Kẻ địch bay (Giằng co với trọng lực)
     for (const e of playFlyEnemies) {
-      e.phase += 0.03;
-      e.y = e.baseY * TILE + (TILE - 28) + Math.sin(e.phase) * 40;
+      e.phase += 0.05; // Tốc độ vỗ cánh
+      
+      let fightX = 0, fightY = 0;
+      if (gravityActive) {
+        // Trọng lực kéo nó, nhưng nó cố gắng bay ngược lại (giằng co)
+        if (gravityDir === 0) fightY = Math.sin(e.phase) * 40 - 20; // Cố bay lên (+ kéo xuống)
+        if (gravityDir === 1) fightY = Math.sin(e.phase) * 40 + 20; // Cố bay xuống (+ kéo lên)
+        if (gravityDir === 2) fightX = Math.sin(e.phase) * 40 + 20; // Cố bay phải
+        if (gravityDir === 3) fightX = Math.sin(e.phase) * 40 - 20; // Cố bay trái
+      } else {
+        fightY = Math.sin(e.phase) * 40; // Bình thường
+      }
+      
+      e.x = e.baseY * TILE + (TILE - 28) + fightX; // baseY dùng tạm làm baseX nếu cần, nhưng ở đây dùng gốc
+      // Thực ra để chuẩn ta cần lưu baseX, baseY
+      if (e.baseX === undefined) { e.baseX = e.x; e.baseY = e.y; }
+      
+      e.x = e.baseX + fightX;
+      e.y = e.baseY + fightY;
     }
 
     for (const e of playEnemies) { if (aabb(player, e)) { respawn(); return; } }
@@ -974,9 +1071,25 @@
 
   function drawPlayer() {
     const { x, y, w, h, facing, keys: keyCount } = player;
+    
+    ctx.save();
+    // Xoay nhân vật theo trọng lực
+    if (gravityActive) {
+      const cx = x + w/2, cy = y + h/2;
+      ctx.translate(cx, cy);
+      if (gravityDir === 1) ctx.rotate(Math.PI); // Lộn ngược
+      else if (gravityDir === 2) ctx.rotate(-Math.PI/2); // Xoay trái
+      else if (gravityDir === 3) ctx.rotate(Math.PI/2); // Xoay phải
+      ctx.translate(-cx, -cy);
+    }
+
     rr(ctx, x, y, w, h, 6); ctx.fillStyle = '#3b82f6'; ctx.fill();
     ctx.fillStyle = '#111827'; const eyeW = 3, eyeH = 10, eyeY = y + (h - eyeH) / 2, pOffset = facing * 1.5;
     ctx.fillRect(x + w/2 - 5 + pOffset, eyeY, eyeW, eyeH); ctx.fillRect(x + w/2 + 2 + pOffset, eyeY, eyeW, eyeH);
+    
+    // Chìa khóa không bị xoay
+    ctx.restore();
+    
     if (keyCount > 0) { ctx.fillStyle = '#fbbf24'; ctx.font = 'bold 10px monospace'; ctx.textAlign = 'center'; ctx.fillText('🔑' + keyCount, x + w/2, y - 5); }
   }
 
@@ -1238,7 +1351,9 @@
     }
     e.preventDefault(); cv.setPointerCapture(e.pointerId); painting = true;
     pushHistory();
-    const { x, y } = getTile(e.clientX, e.clientY); applyTool(x, y, e.button === 2);
+    const { x, y } = getTile(e.clientX, e.clientY); 
+    lastTappedTile = { x, y }; // Lưu lại để nút R trên mobile hoạt động
+    applyTool(x, y, e.button === 2);
   });
   
   cv.addEventListener('pointermove', e => {
