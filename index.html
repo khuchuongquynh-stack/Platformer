@@ -333,7 +333,7 @@
     <button id="redoBtn" class="tool-btn" style="background:#475569; color:#fff;">↪ Redo (Ctrl+Y)</button>
   </div>
 
-  <div class="group-title">Địa hình & Vật phẩm</div>
+  <div class="group-title">ĐỊA HÌNH & VẬT PHẨM</div>
   <div class="btn-group" id="toolButtons">
     <button data-tool="block" class="tool-btn active">🧱 Gạch (1)</button>
     <button data-tool="erase" class="tool-btn">🧹 Xóa (2)</button>
@@ -345,14 +345,14 @@
     <button data-tool="door" class="tool-btn">🚪 Cửa (D)</button>
   </div>
   
-  <div class="group-title">Kẻ địch & Bẫy</div>
+  <div class="group-title">KẺ ĐỊCH & BẪY</div>
   <div class="btn-group">
     <button data-tool="enemy" class="tool-btn">👾 Đi bộ (4)</button>
     <button data-tool="flyEnemy" class="tool-btn">🦇 Bay (F)</button>
     <button data-tool="fire" class="tool-btn">🔥 Lửa (6)</button>
   </div>
 
-  <div class="group-title">Mạch điện & Logic</div>
+  <div class="group-title">MẠCH ĐIỆN & LOGIC</div>
   <div class="btn-group">
     <button data-tool="mover" class="tool-btn">➡️ Di chuyển (7)</button>
     <button data-tool="piston" class="tool-btn">🪵 Pít-tông (P)</button>
@@ -598,21 +598,20 @@
 
   function newGrid() { return Array.from({length: ROWS}, () => new Array(COLS).fill(0)); }
   
-  // === ĐÃ CẬP NHẬT: PÍT-TÔNG LUÔN LÀ KHỐI RẮN ===
   function isSolid(tx, ty) { 
     if (tx < 0 || ty < 0 || tx >= COLS || ty >= ROWS) return true; 
     if (grid[ty][tx] === 1) return true;
     if (doors.some(d => d.x === tx && d.y === ty)) return true;
     
     for (const p of pistons) {
-      if (p.x === tx && p.y === ty) return true; // Đế luôn rắn
+      if (p.x === tx && p.y === ty) return true; 
       if (p.extended) {
         let dx = 0, dy = 0;
         if (p.dir === 0) dy = -1;
         if (p.dir === 1) dx = 1;
         if (p.dir === 2) dy = 1;
         if (p.dir === 3) dx = -1;
-        if (p.x + dx === tx && p.y + dy === ty) return true; // Đầu pít-tông rắn
+        if (p.x + dx === tx && p.y + dy === ty) return true; 
       }
     }
     return false; 
@@ -789,20 +788,23 @@
         if (tx < 0 || ty < 0 || tx >= COLS || ty >= ROWS) {
             canExtend = false;
         } else {
+            // 1. Đẩy Gạch
             if (grid[ty][tx] === 1) {
                 let ttx = tx + dx, tty = ty + dy;
-                if (ttx < 0 || tty < 0 || ttx >= COLS || tty >= ROWS || isSolidForPiston(ttx, tty)) {
+                if (ttx < 0 || tty < 0 || ttx >= COLS || tty >= ROWS || grid[tty][ttx] === 1 || isSolidForPiston(ttx, tty)) {
                     canExtend = false;
                 } else {
                     grid[tty][ttx] = 1;
                     grid[ty][tx] = 0;
                 }
             } 
+            // 2. Vật cản tĩnh khác
             else if (isSolidForPiston(tx, ty)) {
                 canExtend = false;
             }
         }
 
+        // 3. Đẩy MỌI THỨ (Người, Quái, Khối di chuyển, Chìa khóa, Checkpoint, Lò xo, Lửa)
         if (canExtend) {
             const targetRect = { x: tx * TILE, y: ty * TILE, w: TILE, h: TILE };
 
@@ -821,14 +823,25 @@
                 for (const e of playFlyEnemies) {
                     if (aabb(e, targetRect)) { e.x += dx * TILE; e.y += dy * TILE; e.baseX += dx * TILE; e.baseY += dy * TILE; }
                 }
-            }
-
-            if (canExtend) {
                 for (const m of movers) {
                     const mRect = { x: m.x*TILE, y: m.y*TILE, w: TILE, h: TILE };
-                    if (aabb(mRect, targetRect)) {
-                        m.x += dx; m.y += dy;
-                    }
+                    if (aabb(mRect, targetRect)) { m.x += dx; m.y += dy; }
+                }
+                for (const k of keysItems) {
+                    const kRect = { x: k.x*TILE + 8, y: k.y*TILE + 8, w: 16, h: 16 };
+                    if (aabb(kRect, targetRect)) { k.x += dx; k.y += dy; }
+                }
+                for (const cp of checkpoints) {
+                    const cpRect = { x: cp.x*TILE, y: cp.y*TILE, w: TILE, h: TILE };
+                    if (aabb(cpRect, targetRect)) { cp.x += dx; cp.y += dy; }
+                }
+                for (const jp of jumpPads) {
+                    const jpRect = { x: jp.x*TILE, y: jp.y*TILE, w: TILE, h: TILE };
+                    if (aabb(jpRect, targetRect)) { jp.x += dx; jp.y += dy; }
+                }
+                for (const f of fires) {
+                    const fRect = { x: f.x*TILE, y: f.y*TILE, w: TILE, h: TILE };
+                    if (aabb(fRect, targetRect)) { f.x += dx; f.y += dy; }
                 }
             }
         }
@@ -924,6 +937,7 @@
       }
     }
 
+    // Keys (Pickup)
     for (let i = keysItems.length - 1; i >= 0; i--) {
       const k = keysItems[i];
       if (aabb(player, {x: k.x*TILE + 8, y: k.y*TILE + 8, w: 16, h: 16})) {
@@ -931,9 +945,11 @@
       }
     }
     
+    // Doors (Mở rộng hitbox)
     for (let i = doors.length - 1; i >= 0; i--) {
       const d = doors[i];
-      if (player.keys > 0 && aabb(player, {x: d.x*TILE, y: d.y*TILE, w: TILE, h: TILE})) {
+      const dRect = { x: d.x * TILE - 4, y: d.y * TILE - 4, w: TILE + 8, h: TILE + 8 };
+      if (player.keys > 0 && aabb(player, dRect)) {
         player.keys--; playSFX('switch'); spawnParticles(d.x*TILE + 16, d.y*TILE + 16, '#94a3b8', 15); doors.splice(i, 1);
         toast('Đã mở cửa! 🚪');
       }
@@ -1445,3 +1461,4 @@
 </script>
 </body>
 </html>
+  
